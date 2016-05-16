@@ -1,0 +1,126 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<!-- saved from url=(0068)https://rstudio.hres.ca/custom/googleVis/PieChartID40d6217e3f60.html -->
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>PieChartID40d6217e3f60</title>
+
+<style type="text/css">
+body {
+  color: #444444;
+  font-family: Arial,Helvetica,sans-serif;
+  font-size: 75%;
+  }
+  a {
+  color: #4D87C7;
+  text-decoration: none;
+}
+</style>
+<script type="text/javascript" src="./OutcomesPieChart_files/saved_resource"></script><link type="text/css" href="./OutcomesPieChart_files/ui+en.css" rel="stylesheet"><script type="text/javascript" src="./OutcomesPieChart_files/format+en,default+en,ui+en,corechart+en.I.js"></script><link href="./OutcomesPieChart_files/tooltip.css" rel="stylesheet" type="text/css"></head>
+<body>
+ <!-- PieChart generated in R 3.3.0 by googleVis 0.5.10 package -->
+<!-- Mon May 16 17:45:51 2016 -->
+
+
+<!-- jsHeader -->
+<script type="text/javascript">
+ 
+// jsData 
+function gvisDataPieChartID40d6217e3f60 () {
+var data = new google.visualization.DataTable();
+var datajson =
+[
+ [
+ "Not recovered/not resolved",
+5 
+],
+[
+ "Recovered/resolved",
+48 
+],
+[
+ "Recovered/resolved with sequelae",
+2 
+],
+[
+ "Unknown",
+137 
+] 
+];
+data.addColumn('string','OUTCOME_ENG');
+data.addColumn('number','n');
+data.addRows(datajson);
+return(data);
+}
+ 
+// jsDrawChart
+function drawChartPieChartID40d6217e3f60() {
+var data = gvisDataPieChartID40d6217e3f60();
+var options = {};
+options["allowHtml"] = true;
+options["pieHole"] =    0.4;
+
+
+    var chart = new google.visualization.PieChart(
+    document.getElementById('PieChartID40d6217e3f60')
+    );
+    chart.draw(data,options);
+    
+
+}
+  
+ 
+// jsDisplayChart
+(function() {
+var pkgs = window.__gvisPackages = window.__gvisPackages || [];
+var callbacks = window.__gvisCallbacks = window.__gvisCallbacks || [];
+var chartid = "corechart";
+  
+// Manually see if chartid is in pkgs (not all browsers support Array.indexOf)
+var i, newPackage = true;
+for (i = 0; newPackage && i < pkgs.length; i++) {
+if (pkgs[i] === chartid)
+newPackage = false;
+}
+if (newPackage)
+  pkgs.push(chartid);
+  
+// Add the drawChart function to the global list of callbacks
+callbacks.push(drawChartPieChartID40d6217e3f60);
+})();
+function displayChartPieChartID40d6217e3f60() {
+  var pkgs = window.__gvisPackages = window.__gvisPackages || [];
+  var callbacks = window.__gvisCallbacks = window.__gvisCallbacks || [];
+  window.clearTimeout(window.__gvisLoad);
+  // The timeout is set to 100 because otherwise the container div we are
+  // targeting might not be part of the document yet
+  window.__gvisLoad = setTimeout(function() {
+  var pkgCount = pkgs.length;
+  google.load("visualization", "1", { packages:pkgs, callback: function() {
+  if (pkgCount != pkgs.length) {
+  // Race condition where another setTimeout call snuck in after us; if
+  // that call added a package, we must not shift its callback
+  return;
+}
+while (callbacks.length > 0)
+callbacks.shift()();
+} });
+}, 100);
+}
+ 
+// jsFooter
+</script>
+ 
+<!-- jsChart -->  
+<script type="text/javascript" src="./OutcomesPieChart_files/jsapi"></script>
+ 
+<!-- divChart -->
+  
+<div id="PieChartID40d6217e3f60" style="width: 500; height: automatic;"><div style="position: relative;"><div dir="ltr" style="position: relative; width: 1664px; height: 200px;"><div aria-label="A chart." style="position: absolute; left: 0px; top: 0px; width: 100%; height: 100%;"><svg width="1664" height="200" aria-label="A chart." style="overflow: hidden;"><defs id="defs"></defs><rect x="0" y="0" width="1664" height="200" stroke="none" stroke-width="0" fill="#ffffff"></rect><g><rect x="1020" y="38" width="497" height="94" stroke="none" stroke-width="0" fill-opacity="0" fill="#ffffff"></rect><g><rect x="1020" y="38" width="497" height="16" stroke="none" stroke-width="0" fill-opacity="0" fill="#ffffff"></rect><g><text text-anchor="start" x="1042" y="51.6" font-family="Arial" font-size="16" stroke="none" stroke-width="0" fill="#222222">Not recovered/not resolved</text></g><circle cx="1028" cy="46" r="8" stroke="none" stroke-width="0" fill="#3366cc"></circle></g><g><rect x="1020" y="64" width="497" height="16" stroke="none" stroke-width="0" fill-opacity="0" fill="#ffffff"></rect><g><text text-anchor="start" x="1042" y="77.6" font-family="Arial" font-size="16" stroke="none" stroke-width="0" fill="#222222">Recovered/resolved</text></g><circle cx="1028" cy="72" r="8" stroke="none" stroke-width="0" fill="#dc3912"></circle></g><g><rect x="1020" y="90" width="497" height="16" stroke="none" stroke-width="0" fill-opacity="0" fill="#ffffff"></rect><g><text text-anchor="start" x="1042" y="103.6" font-family="Arial" font-size="16" stroke="none" stroke-width="0" fill="#222222">Recovered/resolved with sequelae</text></g><circle cx="1028" cy="98" r="8" stroke="none" stroke-width="0" fill="#ff9900"></circle></g><g><rect x="1020" y="116" width="497" height="16" stroke="none" stroke-width="0" fill-opacity="0" fill="#ffffff"></rect><g><text text-anchor="start" x="1042" y="129.6" font-family="Arial" font-size="16" stroke="none" stroke-width="0" fill="#222222">Unknown</text></g><circle cx="1028" cy="124" r="8" stroke="none" stroke-width="0" fill="#109618"></circle></g></g><g><path d="M571,75.2L571,38A62,62,0,0,1,581.0995193504646,38.8281134107375L575.0398077401858,75.531245364295A24.8,24.8,0,0,0,571,75.2" stroke="#ffffff" stroke-width="1" fill="#3366cc"></path></g><g><path d="M575.0398077401858,75.531245364295L581.0995193504646,38.8281134107375A62,62,0,0,1,632.1718865892625,110.0995193504645L595.468754635705,104.03980774018581A24.8,24.8,0,0,0,575.0398077401858,75.531245364295" stroke="#ffffff" stroke-width="1" fill="#dc3912"></path><text text-anchor="start" x="577.9615395453416" y="89.14599345185361" font-family="Arial" font-size="16" stroke="none" stroke-width="0" fill="#ffffff">25%</text></g><g><path d="M595.468754635705,104.03980774018581L632.1718865892625,110.0995193504645A62,62,0,0,1,631.3803727151947,114.07872830813115L595.1521490860779,105.63149132325246A24.8,24.8,0,0,0,595.468754635705,104.03980774018581" stroke="#ffffff" stroke-width="1" fill="#ff9900"></path></g><g><path d="M595.1521490860779,105.63149132325246L631.3803727151947,114.07872830813113A62,62,0,1,1,571,38L571,75.2A24.8,24.8,0,1,0,595.1521490860779,105.63149132325246" stroke="#ffffff" stroke-width="1" fill="#109618"></path><text text-anchor="start" x="530.6801120921073" y="119.74286880905385" font-family="Arial" font-size="16" stroke="none" stroke-width="0" fill="#ffffff">71.4%</text></g><g></g></svg><div aria-label="A tabular representation of the data in the chart." style="position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden;"><table><thead><tr><th>OUTCOME_ENG</th><th>n</th></tr></thead><tbody><tr><td>Not recovered/not resolved</td><td>5</td></tr><tr><td>Recovered/resolved</td><td>48</td></tr><tr><td>Recovered/resolved with sequelae</td><td>2</td></tr><tr><td>Unknown</td><td>137</td></tr></tbody></table></div></div></div><div aria-hidden="true" style="display: none; position: absolute; top: 210px; left: 1674px; white-space: nowrap; font-family: Arial; font-size: 16px; font-weight: bold;">2 (1%)</div><div></div></div></div>
+ <div><span>Data: outcome_results • Chart ID: <a href="https://rstudio.hres.ca/custom/googleVis/Chart_PieChartID40d6217e3f60.html">PieChartID40d6217e3f60</a> • <a href="https://github.com/mages/googleVis">googleVis-0.5.10</a></span><br> 
+<!-- htmlFooter -->
+<span> 
+  R version 3.3.0 (2016-05-03) 
+  • <a href="https://developers.google.com/terms/">Google Terms of Use</a> • <a href="https://google-developers.appspot.com/chart/interactive/docs/gallery/piechart">Documentation and Data Policy</a>
+</span></div>
+
+
+</body></html>

@@ -1,0 +1,142 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<!-- saved from url=(0067)https://rstudio.hres.ca/custom/googleVis/BarChartID9353d2f9c6c.html -->
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>BarChartID9353d2f9c6c</title>
+
+<style type="text/css">
+body {
+  color: #444444;
+  font-family: Arial,Helvetica,sans-serif;
+  font-size: 75%;
+  }
+  a {
+  color: #4D87C7;
+  text-decoration: none;
+}
+</style>
+<script type="text/javascript" src="./SeriousReasonBarChart_files/saved_resource"></script><link type="text/css" href="./SeriousReasonBarChart_files/ui+en.css" rel="stylesheet"><script type="text/javascript" src="./SeriousReasonBarChart_files/format+en,default+en,ui+en,corechart+en.I.js"></script><link href="./SeriousReasonBarChart_files/tooltip.css" rel="stylesheet" type="text/css"></head>
+<body>
+ <!-- BarChart generated in R 3.3.0 by googleVis 0.5.10 package -->
+<!-- Mon May 16 10:01:54 2016 -->
+
+
+<!-- jsHeader -->
+<script type="text/javascript">
+ 
+// jsData 
+function gvisDataBarChartID9353d2f9c6c () {
+var data = new google.visualization.DataTable();
+var datajson =
+[
+ [
+ "NotSpecified",
+90.90909091 
+],
+[
+ "Hospitalization",
+9.090909091 
+],
+[
+ "Congenital",
+0 
+],
+[
+ "DEATH",
+0 
+],
+[
+ "DISABILITY",
+0 
+],
+[
+ "LIFE_THREATENING",
+0 
+],
+[
+ "OTHER_MEDICALLY_IMP_COND",
+0 
+] 
+];
+data.addColumn('string','Reasons');
+data.addColumn('number','percentage');
+data.addRows(datajson);
+return(data);
+}
+ 
+// jsDrawChart
+function drawChartBarChartID9353d2f9c6c() {
+var data = gvisDataBarChartID9353d2f9c6c();
+var options = {};
+options["allowHtml"] = true;
+options["title"] = "Reasons for serious reports (11 serious reports)";
+options["legend"] = {position:'none'};
+options["bars"] = "horizontal";
+options["axes"] = "x: {\n                                 0: { side: 'top', label: 'Percentage'} \n                                 }";
+options["bar"] = "90%";
+
+
+    var chart = new google.visualization.BarChart(
+    document.getElementById('BarChartID9353d2f9c6c')
+    );
+    chart.draw(data,options);
+    
+
+}
+  
+ 
+// jsDisplayChart
+(function() {
+var pkgs = window.__gvisPackages = window.__gvisPackages || [];
+var callbacks = window.__gvisCallbacks = window.__gvisCallbacks || [];
+var chartid = "corechart";
+  
+// Manually see if chartid is in pkgs (not all browsers support Array.indexOf)
+var i, newPackage = true;
+for (i = 0; newPackage && i < pkgs.length; i++) {
+if (pkgs[i] === chartid)
+newPackage = false;
+}
+if (newPackage)
+  pkgs.push(chartid);
+  
+// Add the drawChart function to the global list of callbacks
+callbacks.push(drawChartBarChartID9353d2f9c6c);
+})();
+function displayChartBarChartID9353d2f9c6c() {
+  var pkgs = window.__gvisPackages = window.__gvisPackages || [];
+  var callbacks = window.__gvisCallbacks = window.__gvisCallbacks || [];
+  window.clearTimeout(window.__gvisLoad);
+  // The timeout is set to 100 because otherwise the container div we are
+  // targeting might not be part of the document yet
+  window.__gvisLoad = setTimeout(function() {
+  var pkgCount = pkgs.length;
+  google.load("visualization", "1", { packages:pkgs, callback: function() {
+  if (pkgCount != pkgs.length) {
+  // Race condition where another setTimeout call snuck in after us; if
+  // that call added a package, we must not shift its callback
+  return;
+}
+while (callbacks.length > 0)
+callbacks.shift()();
+} });
+}, 100);
+}
+ 
+// jsFooter
+</script>
+ 
+<!-- jsChart -->  
+<script type="text/javascript" src="./SeriousReasonBarChart_files/jsapi"></script>
+ 
+<!-- divChart -->
+  
+<div id="BarChartID9353d2f9c6c" style="width: 500; height: automatic;"><div style="position: relative;"><div dir="ltr" style="position: relative; width: 1664px; height: 200px;"><div aria-label="A chart." style="position: absolute; left: 0px; top: 0px; width: 100%; height: 100%;"><svg width="1664" height="200" aria-label="A chart." style="overflow: hidden;"><defs id="defs"><clippath id="_ABSTRACT_RENDERER_ID_0"><rect x="147" y="38" width="1370" height="124"></rect></clippath></defs><rect x="0" y="0" width="1664" height="200" stroke="none" stroke-width="0" fill="#ffffff"></rect><g><text text-anchor="start" x="147" y="24.6" font-family="Arial" font-size="16" font-weight="bold" stroke="none" stroke-width="0" fill="#000000">Reasons for serious reports (11 serious reports)</text><rect x="147" y="11" width="1370" height="16" stroke="none" stroke-width="0" fill-opacity="0" fill="#ffffff"></rect></g><g><rect x="147" y="38" width="1370" height="124" stroke="none" stroke-width="0" fill-opacity="0" fill="#ffffff"></rect><g clip-path="url(https://rstudio.hres.ca/custom/googleVis/BarChartID9353d2f9c6c.html#_ABSTRACT_RENDERER_ID_0)"><g><rect x="147" y="38" width="1" height="124" stroke="none" stroke-width="0" fill="#cccccc"></rect><rect x="489" y="38" width="1" height="124" stroke="none" stroke-width="0" fill="#cccccc"></rect><rect x="832" y="38" width="1" height="124" stroke="none" stroke-width="0" fill="#cccccc"></rect><rect x="1174" y="38" width="1" height="124" stroke="none" stroke-width="0" fill="#cccccc"></rect><rect x="1516" y="38" width="1" height="124" stroke="none" stroke-width="0" fill="#cccccc"></rect></g><g><rect x="148" y="42" width="1244" height="11" stroke="none" stroke-width="0" fill="#3366cc"></rect><rect x="148" y="59" width="123" height="11" stroke="none" stroke-width="0" fill="#3366cc"></rect><rect x="147" y="77" width="0.5" height="11" stroke="none" stroke-width="0" fill="#3366cc"></rect><rect x="147" y="95" width="0.5" height="10" stroke="none" stroke-width="0" fill="#3366cc"></rect><rect x="147" y="112" width="0.5" height="11" stroke="none" stroke-width="0" fill="#3366cc"></rect><rect x="147" y="130" width="0.5" height="11" stroke="none" stroke-width="0" fill="#3366cc"></rect><rect x="147" y="147" width="0.5" height="11" stroke="none" stroke-width="0" fill="#3366cc"></rect></g><g><rect x="147" y="38" width="1" height="124" stroke="none" stroke-width="0" fill="#333333"></rect></g></g><g></g><g><g><text text-anchor="middle" x="147.5" y="185.6" font-family="Arial" font-size="16" stroke="none" stroke-width="0" fill="#444444">0</text></g><g><text text-anchor="middle" x="489.75" y="185.6" font-family="Arial" font-size="16" stroke="none" stroke-width="0" fill="#444444">25</text></g><g><text text-anchor="middle" x="832" y="185.6" font-family="Arial" font-size="16" stroke="none" stroke-width="0" fill="#444444">50</text></g><g><text text-anchor="middle" x="1174.25" y="185.6" font-family="Arial" font-size="16" stroke="none" stroke-width="0" fill="#444444">75</text></g><g><text text-anchor="middle" x="1516.5" y="185.6" font-family="Arial" font-size="16" stroke="none" stroke-width="0" fill="#444444">100</text></g><g><text text-anchor="end" x="145" y="52.885714285714286" font-family="Arial" font-size="16" stroke="none" stroke-width="0" fill="#222222">NotSpecified</text></g><g><text text-anchor="end" x="145" y="88.02857142857142" font-family="Arial" font-size="16" stroke="none" stroke-width="0" fill="#222222">Congenital</text></g><g><text text-anchor="end" x="145" y="123.17142857142858" font-family="Arial" font-size="16" stroke="none" stroke-width="0" fill="#222222">DISABILITY</text></g><g><text text-anchor="end" x="145" y="158.31428571428572" font-family="Arial" font-size="16" stroke="none" stroke-width="0" fill="#222222">OTHER_MEDICA…</text><rect x="2" y="144.71428571428572" width="143" height="16" stroke="none" stroke-width="0" fill-opacity="0" fill="#ffffff"></rect></g></g></g><g></g></svg><div aria-label="A tabular representation of the data in the chart." style="position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden;"><table><thead><tr><th>Reasons</th><th>percentage</th></tr></thead><tbody><tr><td>NotSpecified</td><td>90.909</td></tr><tr><td>Hospitalization</td><td>9.091</td></tr><tr><td>Congenital</td><td>0</td></tr><tr><td>DEATH</td><td>0</td></tr><tr><td>DISABILITY</td><td>0</td></tr><tr><td>LIFE_THREATENING</td><td>0</td></tr><tr><td>OTHER_MEDICALLY_IMP_COND</td><td>0</td></tr></tbody></table></div></div></div><div aria-hidden="true" style="display: none; position: absolute; top: 210px; left: 1674px; white-space: nowrap; font-family: Arial; font-size: 16px; font-weight: bold;">Reasons for serious reports (11 serious reports)</div><div></div></div></div>
+ <div><span>Data: data • Chart ID: <a href="https://rstudio.hres.ca/custom/googleVis/Chart_BarChartID9353d2f9c6c.html">BarChartID9353d2f9c6c</a> • <a href="https://github.com/mages/googleVis">googleVis-0.5.10</a></span><br> 
+<!-- htmlFooter -->
+<span> 
+  R version 3.3.0 (2016-05-03) 
+  • <a href="https://developers.google.com/terms/">Google Terms of Use</a> • <a href="https://google-developers.appspot.com/chart/interactive/docs/gallery/barchart">Documentation and Data Policy</a>
+</span></div><div style="position: absolute; display: none;"><div style="padding: 1px; border: 1px solid infotext; font-size: 16px; margin: 16px; font-family: Arial; background: infobackground;">OTHER_MEDICALLY_IMP_COND</div></div>
+
+
+</body></html>

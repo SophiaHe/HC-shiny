@@ -1,0 +1,136 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<!-- saved from url=(0067)https://rstudio.hres.ca/custom/googleVis/PieChartID935259eaecb.html -->
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>PieChartID935259eaecb</title>
+
+<style type="text/css">
+body {
+  color: #444444;
+  font-family: Arial,Helvetica,sans-serif;
+  font-size: 75%;
+  }
+  a {
+  color: #4D87C7;
+  text-decoration: none;
+}
+</style>
+<script type="text/javascript" src="./AgeGroupsPieChart_files/saved_resource"></script><link type="text/css" href="./AgeGroupsPieChart_files/ui+en.css" rel="stylesheet"><script type="text/javascript" src="./AgeGroupsPieChart_files/format+en,default+en,ui+en,corechart+en.I.js"></script><link href="./AgeGroupsPieChart_files/tooltip.css" rel="stylesheet" type="text/css"></head>
+<body>
+ <!-- PieChart generated in R 3.3.0 by googleVis 0.5.10 package -->
+<!-- Mon May 16 10:43:11 2016 -->
+
+
+<!-- jsHeader -->
+<script type="text/javascript">
+ 
+// jsData 
+function gvisDataPieChartID935259eaecb () {
+var data = new google.visualization.DataTable();
+var datajson =
+[
+ [
+ "Adolescent",
+8 
+],
+[
+ "Adult",
+99 
+],
+[
+ "Child",
+15 
+],
+[
+ "Elderly",
+47 
+],
+[
+ "Infant",
+16 
+],
+[
+ "Unknown",
+7 
+] 
+];
+data.addColumn('string','AGE_GROUP_CLEAN');
+data.addColumn('number','n');
+data.addRows(datajson);
+return(data);
+}
+ 
+// jsDrawChart
+function drawChartPieChartID935259eaecb() {
+var data = gvisDataPieChartID935259eaecb();
+var options = {};
+options["allowHtml"] = true;
+options["pieHole"] =    0.4;
+options["pieSliceText"] = "percentage";
+options["fontSize"] =     12;
+
+
+    var chart = new google.visualization.PieChart(
+    document.getElementById('PieChartID935259eaecb')
+    );
+    chart.draw(data,options);
+    
+
+}
+  
+ 
+// jsDisplayChart
+(function() {
+var pkgs = window.__gvisPackages = window.__gvisPackages || [];
+var callbacks = window.__gvisCallbacks = window.__gvisCallbacks || [];
+var chartid = "corechart";
+  
+// Manually see if chartid is in pkgs (not all browsers support Array.indexOf)
+var i, newPackage = true;
+for (i = 0; newPackage && i < pkgs.length; i++) {
+if (pkgs[i] === chartid)
+newPackage = false;
+}
+if (newPackage)
+  pkgs.push(chartid);
+  
+// Add the drawChart function to the global list of callbacks
+callbacks.push(drawChartPieChartID935259eaecb);
+})();
+function displayChartPieChartID935259eaecb() {
+  var pkgs = window.__gvisPackages = window.__gvisPackages || [];
+  var callbacks = window.__gvisCallbacks = window.__gvisCallbacks || [];
+  window.clearTimeout(window.__gvisLoad);
+  // The timeout is set to 100 because otherwise the container div we are
+  // targeting might not be part of the document yet
+  window.__gvisLoad = setTimeout(function() {
+  var pkgCount = pkgs.length;
+  google.load("visualization", "1", { packages:pkgs, callback: function() {
+  if (pkgCount != pkgs.length) {
+  // Race condition where another setTimeout call snuck in after us; if
+  // that call added a package, we must not shift its callback
+  return;
+}
+while (callbacks.length > 0)
+callbacks.shift()();
+} });
+}, 100);
+}
+ 
+// jsFooter
+</script>
+ 
+<!-- jsChart -->  
+<script type="text/javascript" src="./AgeGroupsPieChart_files/jsapi"></script>
+ 
+<!-- divChart -->
+  
+<div id="PieChartID935259eaecb" style="width: 500; height: automatic;"><div style="position: relative;"><div dir="ltr" style="position: relative; width: 1664px; height: 200px;"><div aria-label="A chart." style="position: absolute; left: 0px; top: 0px; width: 100%; height: 100%;"><svg width="1664" height="200" aria-label="A chart." style="overflow: hidden;"><defs id="defs"></defs><rect x="0" y="0" width="1664" height="200" stroke="none" stroke-width="0" fill="#ffffff"></rect><g><rect x="1013" y="38" width="504" height="107" stroke="none" stroke-width="0" fill-opacity="0" fill="#ffffff"></rect><g><rect x="1013" y="38" width="504" height="12" stroke="none" stroke-width="0" fill-opacity="0" fill="#ffffff"></rect><g><text text-anchor="start" x="1030" y="48.2" font-family="Arial" font-size="12" stroke="none" stroke-width="0" fill="#222222">Adolescent</text></g><circle cx="1019" cy="44" r="6" stroke="none" stroke-width="0" fill="#3366cc"></circle></g><g><rect x="1013" y="57" width="504" height="12" stroke="none" stroke-width="0" fill-opacity="0" fill="#ffffff"></rect><g><text text-anchor="start" x="1030" y="67.2" font-family="Arial" font-size="12" stroke="none" stroke-width="0" fill="#222222">Adult</text></g><circle cx="1019" cy="63" r="6" stroke="none" stroke-width="0" fill="#dc3912"></circle></g><g><rect x="1013" y="76" width="504" height="12" stroke="none" stroke-width="0" fill-opacity="0" fill="#ffffff"></rect><g><text text-anchor="start" x="1030" y="86.2" font-family="Arial" font-size="12" stroke="none" stroke-width="0" fill="#222222">Child</text></g><circle cx="1019" cy="82" r="6" stroke="none" stroke-width="0" fill="#ff9900"></circle></g><g><rect x="1013" y="95" width="504" height="12" stroke="none" stroke-width="0" fill-opacity="0" fill="#ffffff"></rect><g><text text-anchor="start" x="1030" y="105.2" font-family="Arial" font-size="12" stroke="none" stroke-width="0" fill="#222222">Elderly</text></g><circle cx="1019" cy="101" r="6" stroke="none" stroke-width="0" fill="#109618"></circle></g><g><rect x="1013" y="114" width="504" height="12" stroke="none" stroke-width="0" fill-opacity="0" fill="#ffffff"></rect><g><text text-anchor="start" x="1030" y="124.2" font-family="Arial" font-size="12" stroke="none" stroke-width="0" fill="#222222">Infant</text></g><circle cx="1019" cy="120" r="6" stroke="none" stroke-width="0" fill="#990099"></circle></g><g><rect x="1013" y="133" width="504" height="12" stroke="none" stroke-width="0" fill-opacity="0" fill="#ffffff"></rect><g><text text-anchor="start" x="1030" y="143.2" font-family="Arial" font-size="12" stroke="none" stroke-width="0" fill="#222222">Unknown</text></g><circle cx="1019" cy="139" r="6" stroke="none" stroke-width="0" fill="#0099c6"></circle></g></g><g><path d="M571,75.2L571,38A62,62,0,0,1,587.0467807963563,40.11259877007777L577.4187123185425,76.04503950803111A24.8,24.8,0,0,0,571,75.2" stroke="#ffffff" stroke-width="1" fill="#3366cc"></path></g><g><path d="M565.3685086767475,75.84785091392213L556.9212716918688,39.61962728480532A62,62,0,0,1,571,38L571,75.2A24.8,24.8,0,0,0,565.3685086767475,75.84785091392213" stroke="#ffffff" stroke-width="1" fill="#0099c6"></path></g><g><path d="M554.0469109098328,81.89937099709367L528.617277274582,54.74842749273419A62,62,0,0,1,556.9212716918688,39.61962728480532L565.3685086767475,75.84785091392213A24.8,24.8,0,0,0,554.0469109098328,81.89937099709367" stroke="#ffffff" stroke-width="1" fill="#990099"></path></g><g><path d="M552.3543727745214,116.3517762144817L524.3859319363033,140.87944053620424A62,62,0,0,1,528.617277274582,54.74842749273419L554.0469109098328,81.89937099709367A24.8,24.8,0,0,0,552.3543727745214,116.3517762144817" stroke="#ffffff" stroke-width="1" fill="#109618"></path><text text-anchor="start" x="521.5761137412475" y="102.63168003570873" font-family="Arial" font-size="12" stroke="none" stroke-width="0" fill="#ffffff">24.5%</text></g><g><path d="M562.2641988115535,123.21046698358168L549.1604970288835,158.0261674589542A62,62,0,0,1,524.3859319363033,140.87944053620424L552.3543727745214,116.3517762144817A24.8,24.8,0,0,0,562.2641988115535,123.21046698358168" stroke="#ffffff" stroke-width="1" fill="#ff9900"></path></g><g><path d="M577.4187123185425,76.04503950803111L587.0467807963563,40.11259877007777A62,62,0,1,1,549.1604970288835,158.0261674589542L562.2641988115535,123.21046698358168A24.8,24.8,0,1,0,577.4187123185425,76.04503950803111" stroke="#ffffff" stroke-width="1" fill="#dc3912"></path><text text-anchor="start" x="583.4920647606571" y="113.83661679422876" font-family="Arial" font-size="12" stroke="none" stroke-width="0" fill="#ffffff">51.6%</text></g><g></g></svg><div aria-label="A tabular representation of the data in the chart." style="position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden;"><table><thead><tr><th>AGE_GROUP_CLEAN</th><th>n</th></tr></thead><tbody><tr><td>Adolescent</td><td>8</td></tr><tr><td>Adult</td><td>99</td></tr><tr><td>Child</td><td>15</td></tr><tr><td>Elderly</td><td>47</td></tr><tr><td>Infant</td><td>16</td></tr><tr><td>Unknown</td><td>7</td></tr></tbody></table></div></div></div><div aria-hidden="true" style="display: none; position: absolute; top: 210px; left: 1674px; white-space: nowrap; font-family: Arial; font-size: 12px;">Unknown</div><div></div></div></div>
+ <div><span>Data: age_groups • Chart ID: <a href="https://rstudio.hres.ca/custom/googleVis/Chart_PieChartID935259eaecb.html">PieChartID935259eaecb</a> • <a href="https://github.com/mages/googleVis">googleVis-0.5.10</a></span><br> 
+<!-- htmlFooter -->
+<span> 
+  R version 3.3.0 (2016-05-03) 
+  • <a href="https://developers.google.com/terms/">Google Terms of Use</a> • <a href="https://google-developers.appspot.com/chart/interactive/docs/gallery/piechart">Documentation and Data Policy</a>
+</span></div>
+
+
+</body></html>
