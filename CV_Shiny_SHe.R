@@ -601,24 +601,16 @@ server <- function(input, output) {
   
   ################ Create Age Group histogram in Patient tab ##################   
   output$agehist <- renderPlotly({
-    ages <- ages()
+    age_groups_hist <- age_groups %>% 
+      filter(AGE_GROUP_CLEAN != "Unknown") #exclude the unknown
     
-    age_groups <- mutate(ages,
-                         age_group = NA,
-                         age_group = ifelse(term <= 28/365, "Neonate", age_group),
-                         age_group = ifelse(term <= 2 & term > 28/365, "Infant", age_group),
-                         age_group = ifelse(term > 2 & term < 12, "Child", age_group),
-                         age_group = ifelse(term >= 12 & term < 18, "Adolescent", age_group),
-                         age_group = ifelse(term >= 18 & term < 65, "Adult", age_group),
-                         age_group = ifelse(term >= 65, "Elderly", age_group)) %T>%
-                         {unknown <<- filter(., term >= 130) %>% nrow()} %>%
-      filter(term < 130) #exclude the unknown
+    unknown <- age_groups$n[age_groups$AGE_GROUP_CLEAN == "Unknown"]
     
     plottitle <- paste0("Histogram of Patient Ages")
     if(unknown > 0) plottitle <- paste0(plottitle, "<br>(", unknown, "Reports with Unknown Age Group Excluded)")
     
-    hist <- ggplot(age_groups, aes(x = AGE_GROUP_CLEAN, weight = n, fill = age_group)) +
-      geom_histogram() +
+    hist <- ggplot(age_groups_hist, aes(x = AGE_GROUP_CLEAN,  weight=n, fill=AGE_GROUP_CLEAN)) +
+      geom_bar()+
       ggtitle(plottitle) + 
       xlab("Age at onset (years)") + 
       ylab("Number of Reports") +
@@ -628,22 +620,21 @@ server <- function(input, output) {
     ggplotly(hist)
     
   })
+  
+  # CHECK for missing values in indication, drugnames for those 2 tabs!!!!!!!!!!!!!!
   ################ Create drug plots in Drug tab ################## 
   output$drugplot <- renderPlot({
     
-    data <- faers_query()
+    data <- cv_drug_tab_topdrg()
+    # test NEED WORK HERE to optimize the drugs_tab2 process!!!!!!!!!!!!!!!!!!
+    data <-drugs_tab2(current_generic="phenytoin",current_brand="DILANTIN",current_rxn="Drug level increased",date_ini=ymd("19650101"),date_end=ymd("20151231"))
     
-    drugs <- data$openfda_query %>%
-      fda_count("patient.drug.openfda.generic_name.exact") %>%
-      fda_limit(1000) %>%
-      fda_exec()
+    drugs <- ddply(data,"DRUGNAME", count_func) 
+    drugs_sorted <- drugs[order(-drugs$n),]         
     
-    if(is.null(drugs)) drugs <- data.table(term = character(), count = numeric())
-    if(!is.na(data$current_search[[1]])) drugs <- filter(drugs, !term == data$current_search[[1]])
-    
-    p <- ggplot(drugs[1:25,], aes(x = term, y = count, fill = term)) + 
+    p <- ggplot(drugs_sorted[1:25,], aes(x = DRUGNAME, y = n, fill = DRUGNAME)) + 
       geom_bar(stat = "identity") + 
-      scale_x_discrete(limits = rev(drugs$term[1:25])) + 
+      scale_x_discrete(limits = rev(drugs_sorted$DRUGNAME[1:25])) + 
       coord_flip() +
       ggtitle("Top 25 Drugs (in addition to search term)") +
       xlab("Drug (generic name)") + 
@@ -655,62 +646,17 @@ server <- function(input, output) {
     p
   })
   
-  output$drugclassplot <- renderPlot({
-    data <- faers_query()
-    
-    drugclass <- data$openfda_query %>%
-      fda_count("patient.drug.openfda.pharm_class_epc.exact") %>%
-      fda_limit(1000) %>%
-      fda_exec()
-    
-    if(is.null(drugclass)) drugclass <- data.table(term = character(), count = numeric())
-    
-    p <- ggplot(drugclass[1:25,], aes(x = term, y = count, fill = term)) + 
-      geom_bar(stat = "identity") + 
-      scale_x_discrete(limits = rev(drugclass$term[1:25])) + 
-      coord_flip() +
-      ggtitle("Top 25 Drug Classes \n(including search term)") +
-      xlab("Established Pharmaceutical Class") + 
-      ylab("Number of Instances (thousands)") +
-      theme_bw() +
-      theme(plot.title = element_text(lineheight=.8, face="bold"), 
-            legend.position = "none") +
-      scale_y_continuous(labels = format1K)
-    p
-  })
-  
-  ################ Create Outcomes(all reactions) pie chart in Reaction tab ################## 
-  output$outcomeplot <- renderGvis({
-    data <- faers_query()
-    
-    outcome_results <- data$openfda_query %>% 
-      fda_count("patient.reaction.reactionoutcome") %>% 
-      fda_exec() 
-    if(is.null(outcome_results)) outcome_results <- data.table(term = numeric(), count = numeric())
-    
-    outcome_results <- outcome_results %>%  
-      left_join(outcome_code) %>%
-      select(label, count)
-    
-    gvisPieChart(outcome_results, 
-                 labelvar = "label",
-                 numvar = "count", 
-                 options = list(pieHole = 0.4))
-  })
-  
   output$indicationplot <- renderPlot({
-    data <- faers_query()
+    data <- cv_drug_tab_indc()
+    # test
+    data <-drugs_tab(current_generic="phenytoin",current_brand="DILANTIN",current_rxn=NA,date_ini=ymd("19650101"),date_end=ymd("20151231"))
     
-    indications <- data$openfda_query %>%
-      fda_count("patient.drug.drugindication.exact") %>%
-      fda_limit(1000) %>%
-      fda_exec()
+    indications <- ddply(data,"INDICATION_NAME_ENG", count_func) 
+    indications_sorted <- indications[order(-indications$n),]
     
-    if(is.null(indications)) indications <- data.table(term = character(), count = numeric())
-    
-    p <- ggplot(indications[1:25,], aes(x = term, y = count, fill = term)) + 
+    p <- ggplot(indications_sorted[1:25,], aes(x = INDICATION_NAME_ENG, y = n, fill = INDICATION_NAME_ENG)) + 
       geom_bar(stat = "identity") + 
-      scale_x_discrete(limits = rev(indications$term[1:25])) + 
+      scale_x_discrete(limits = rev(indications_sorted$INDICATION_NAME_ENG[1:25])) + 
       coord_flip() +
       ggtitle("Top 25 Indications (All Drugs)") +
       xlab("Indication") + 
@@ -721,6 +667,23 @@ server <- function(input, output) {
       scale_y_continuous(labels = format1K)
     p
   })
+  
+  ################ Create Outcomes(all reactions) pie chart in Reaction tab ################## 
+  output$outcomeplot <- renderGvis({
+    data <- cv_reactions_tab()
+    
+    #test
+    data <- reactions_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
+    
+    outcome_results <- ddply(data, "OUTCOME_ENG",count_func)
+    
+    gvisPieChart(outcome_results, 
+                 labelvar = "OUTCOME_ENG",
+                 numvar = "n", 
+                 options = list(pieHole = 0.4))
+  })
+  
+  
   
   
   
