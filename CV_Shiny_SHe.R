@@ -12,12 +12,14 @@ library(googleVis)
 library(openfda)
 library(stringr)
 library(plyr)
+library(data.table)
 
 
-##########Query to fetch top 1000 specific results to be used in dropdown menu ##########
+########## Codes to fetch top 1000 specific results to be used in dropdown menu ##########
 
-#data frames used in DRUGS tab for top 25 drugs with most reports submitted
+#data frames used in DRUGS tab for top 1000 drugs with most reports submitted
 #Fetch top 1000 most-reported ingredients
+setwd("~/CV_Shiny_Tab")
 source("Dropdown_Menu_Func.R")
 topingd <- topingd_func(n=1000)
 
@@ -28,38 +30,9 @@ topbrands <- topdrug_func(n=1000)
 toprxns <- toprxn_func(n=1000)
 
 
-#########Create data frames to construct shiny App#########
-reporter_code <- data.table(term = 1:5,
-                            label = c("Physician",
-                                      "Pharmacist",
-                                      "Other Health Professional",
-                                      "Lawyer",
-                                      "Consumer or Non-Health Professional"))
-outcome_code <- data.table(term = 1:6,
-                           label = c("Recovererd/resolved",
-                                     "Recovering/resolving",
-                                     "Not recovered/not resolved",
-                                     "Recovered/resolved with sequelae",
-                                     "Fatal",
-                                     "Unknown"))
-
-sex_code <- data.table(term = 0:2,
-                       label = c("Unknown",
-                                 "Male",
-                                 "Female"))
-
-age_code <- data.table(term = 800:805,
-                       label = c("Decade",
-                                 "Year",
-                                 "Month",
-                                 "Week",
-                                 "Day",
-                                 "Hour"))
-
-
 ############### Create function ###################
 # function to plot adverse reaction plot
- adrplot_test <- reports_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
+ # adrplot_test <- reports_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
  #adrplot_df <- reports_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
 
 count_func <- function(x){
@@ -101,9 +74,13 @@ format1K <- function(x){
 hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
 
 ############### Server Functions ###################
-# import searched data into shiny
 server <- function(input, output) {
   # Data frame generate reactive function to be used to assign: data <- cv_reports_tab() 
+  source("Reports_Tab_Func SHe.R")
+  source("Patients_Tab_Func SHe.R")
+  source("Drugs_Tab_Func SHe.R")
+  source("Reactions_Tab_Func SHe.R")
+  
   cv_reports_tab <- reactive({
     input$searchButton
     #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
@@ -203,95 +180,52 @@ server <- function(input, output) {
     reactions_tab_df <- reactions_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
     return(reactions_tab_df)
   })
-  #############Re-format adverse event onset ages function###############
-  ages <- reactive({
-    data <- cv_query()
+  
+  cv_search_tab <- reactive({
+    input$searchButton
+    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    current_generic <- isolate(ifelse(input$search_generic == "",
+                                      NA,
+                                      input$search_generic)) 
+    current_brand <- isolate(ifelse(input$search_brand == "",
+                                    NA,
+                                    input$search_brand)) 
+    current_rxn <- isolate(ifelse(input$search_rxn == "",
+                                  NA,
+                                  input$search_rxn)) 
+    current_date_range <- isolate(input$searchDateRange)
+    date_ini <- paste(">=",input$current_date_range[1])
+    date_end <- paste("<=",input$current_date_range[2])
     
-    
-    #select report received date & count number of report 
-    age_years <- data$openfda_query %>% 
-      fda_filter("patient.patientonsetageunit", "801") %>%
-      fda_count("patient.patientonsetage") %>%
-      fda_exec()  
-    if(is.null(age_years)) age_years <- data.table(term = numeric(), count = numeric())
-    
-    age_decades <- data$openfda_query %>% 
-      fda_filter("patient.patientonsetageunit", "800") %>%
-      fda_count("patient.patientonsetage") %>%
-      fda_exec()  
-    
-    if(is.null(age_decades)) age_decades <- data.table(term = numeric(), count = numeric())
-    age_decades <- age_decades %>%
-      mutate(term = term*10)
-    
-    age_months <- data$openfda_query %>% 
-      fda_filter("patient.patientonsetageunit", "802") %>%
-      fda_count("patient.patientonsetage") %>%
-      fda_exec() 
-    if(is.null(age_months)) age_months <- data.table(term = numeric(), count = numeric())
-    age_months <- age_months %>% 
-      mutate(term = term/12)
-    
-    age_weeks <- data$openfda_query %>% 
-      fda_filter("patient.patientonsetageunit", "803") %>%
-      fda_count("patient.patientonsetage") %>%
-      fda_exec() 
-    if(is.null(age_weeks)) age_weeks <- data.table(term = numeric(), count = numeric())
-    age_weeks <- age_weeks %>% 
-      mutate(term = term/52)
-    
-    age_days <- data$openfda_query %>% 
-      fda_filter("patient.patientonsetageunit", "804") %>%
-      fda_count("patient.patientonsetage") %>%
-      fda_exec() 
-    if(is.null(age_days)) age_days <- data.table(term = numeric(), count = numeric())
-    age_days <- age_days %>%  mutate(term = term/365)
-    
-    age_hours <- data$openfda_query %>% 
-      fda_filter("patient.patientonsetageunit", "805") %>%
-      fda_count("patient.patientonsetage") %>%
-      fda_exec() 
-    if(is.null(age_hours)) age_hours <- data.table(term = numeric(), count = numeric())
-    age_hours <- age_hours %>%  mutate(term = term/(365*24))
-    
-    ages <- bind_rows(age_years, 
-                      age_decades,
-                      age_months,
-                      age_weeks,
-                      age_days,
-                      age_hours) %>%
-      count(term, wt = count)
+    reactions_tab_df <- data.table(names = c("Generic Name:", 
+                                             "Brand Name:", 
+                                             "Adverse Reaction Term:",
+                                             "Date Range:"),
+                                   terms = c(current_generic,current_brand,current_rxn,paste(date_ini," to ", date_end)))
+    return(reactions_tab_df)
   })
+  
+  #current_generic = "a"
+  #current_brand = NA
+  #current_rxn = "c"
+  #date_ini = "d"
+  #date_end = "f"
 
   
-  output$search_url <- renderUI({url <- faers_query()$query_url 
-  tags$a(url, href=url)
-  })
+
 #############################################  
   
   
-  #define dropdown menu for generic name, brand name, adverse reaction term & date range
-  #### NEED MORE WORK!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ############## Construct Current_Query_Table for generic name, brand name, adverse reaction term & date range searched ############
   output$current_search <- renderTable({
-    data <- cv_reports_tab()
-    data.table(names = c("Generic Name:", 
-                         "Brand Name:", 
-                         "Adverse Reaction Term:",
-                         "Date Range:"),
-               values = c(ifelse(is.na(data$current_search[[1]]),
-                                 "Not Specified",
-                                 data$current_search[[1]]),
-                          ifelse(is.na(data$current_search[[2]]),
-                                 "Not Specified",
-                                 data$current_search[[2]]),
-                          ifelse(is.na(data$current_search[[3]]),
-                                 "Not Specified (All)",
-                                 data$current_search[[3]]),
-                          paste(data$current_search[[4]], collapse = " to ")))
+    data <- cv_search_tab()
+    
+    reactions_tab_df$terms[is.na(reactions_tab_df$terms) == TRUE] <- "Not Specified"
+    
   }, include.rownames = FALSE, include.colnames = FALSE)
   
   #IMPORTANT NOTE!!!!!!!!
-  #create master tables based on searched items combination called cv_query, which will be later used as the table to create charts
+  #create master tables based on searched items combination called cv_XX_tab, which will be later used as the table to create charts
   #reports_tab_df <- reports_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
   #patients_tab_df <- patients_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
   #drug_tab_indc_df <- drugs_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
@@ -363,7 +297,7 @@ server <- function(input, output) {
   output$seriousreasonsplot <- renderGvis({
     data <- cv_reports_tab()
     # test
-    data <- reports_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
+    # data <- reports_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
     
     # calculate total number of serious reports
     total_serious <- as.data.frame(ddply(data,"SERIOUSNESS_ENG",count_func))
@@ -526,7 +460,7 @@ server <- function(input, output) {
   output$sexplot <- renderGvis({
     data <- cv_patients_tab()
     # test
-    data <-patients_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
+    # data <-patients_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
     #data_drugs_indt <- drugs_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
     #data_drugs_topdg <- drugs_tab2(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
     #data_reaction <- reactions_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
@@ -549,7 +483,7 @@ server <- function(input, output) {
     
     data <- cv_patients_tab()
     # test
-    data <-patients_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
+    # data <-patients_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
     
     # Age groups frequency table
     age_groups <- ddply(data, "AGE_GROUP_CLEAN",count_func)
@@ -588,7 +522,7 @@ server <- function(input, output) {
     
     data <- cv_drug_tab_topdrg()
     # test NEED WORK HERE to optimize the drugs_tab2 process!!!!!!!!!!!!!!!!!!
-    data <-drugs_tab2(current_generic="phenytoin",current_brand="DILANTIN",current_rxn="Drug level increased",date_ini=ymd("19650101"),date_end=ymd("20151231"))
+    # data <-drugs_tab2(current_generic="phenytoin",current_brand="DILANTIN",current_rxn="Drug level increased",date_ini=ymd("19650101"),date_end=ymd("20151231"))
     
     drugs <- ddply(data,"DRUGNAME", count_func) 
     drugs_sorted <- drugs[order(-drugs$n),]         
@@ -610,7 +544,7 @@ server <- function(input, output) {
   output$indicationplot <- renderPlot({
     data <- cv_drug_tab_indc()
     # test
-    data <-drugs_tab(current_generic="phenytoin",current_brand="DILANTIN",current_rxn=NA,date_ini=ymd("19650101"),date_end=ymd("20151231"))
+    # data <-drugs_tab(current_generic="phenytoin",current_brand="DILANTIN",current_rxn=NA,date_ini=ymd("19650101"),date_end=ymd("20151231"))
     
     indications <- ddply(data,"INDICATION_NAME_ENG", count_func) 
     indications_sorted <- indications[order(-indications$n),]
@@ -634,7 +568,7 @@ server <- function(input, output) {
     data <- cv_reactions_tab()
     
     #test
-    data <- reactions_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
+    # data <- reactions_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
     
     outcome_results <- ddply(data, "OUTCOME_ENG",count_func)
     
