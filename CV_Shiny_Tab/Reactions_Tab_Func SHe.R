@@ -49,54 +49,44 @@ reactions_tab <- function(current_generic, current_brand,current_rxn, date_ini, 
                           }
   
   cv_drug_product_ingredients_rxn <- if(is.na(current_generic) == FALSE){
-                                        as.data.frame(
                                           tbl(hcopen, sql("SELECT * FROM cv_drug_product_ingredients")) %>%
                                             select(DRUG_PRODUCT_ID, ACTIVE_INGREDIENT_NAME) %>%
-                                            filter(ACTIVE_INGREDIENT_NAME == current_generic),
-                                          n=-1)
+                                            filter(ACTIVE_INGREDIENT_NAME == current_generic)
                                       } else {
-                                        as.data.frame(
                                           tbl(hcopen, sql("SELECT * FROM cv_drug_product_ingredients")) %>%
-                                            select(DRUG_PRODUCT_ID, ACTIVE_INGREDIENT_NAME),
-                                          n=-1)
+                                            select(DRUG_PRODUCT_ID, ACTIVE_INGREDIENT_NAME)
                                       }
                                       
   cv_report_drug_rxn <- if(is.na(current_brand) == FALSE){
-                          as.data.frame(
                             tbl(hcopen,sql("SELECT * FROM cv_report_drug")) %>%
                               select(REPORT_ID,DRUG_PRODUCT_ID,DRUGNAME) %>%
-                              filter(DRUGNAME == current_brand),
-                            n=-1)
+                              filter(DRUGNAME == current_brand)
                         } else {
-                          as.data.frame(
                             tbl(hcopen,sql("SELECT * FROM cv_report_drug")) %>%
-                              select(REPORT_ID,DRUG_PRODUCT_ID,DRUGNAME),
-                            n=-1)
+                              select(REPORT_ID,DRUG_PRODUCT_ID,DRUGNAME)
                         }
-  cv_report_drug_rxn <- cv_report_drug_rxn[order(cv_report_drug_rxn$DRUG_PRODUCT_ID),]  
+  # cv_report_drug_rxn <- cv_report_drug_rxn[order(cv_report_drug_rxn$DRUG_PRODUCT_ID),]  
   
   cv_reactions_rxn <- if(is.na(current_rxn) == FALSE){
-                        as.data.frame(
                           tbl(hcopen,sql("SELECT * FROM cv_reactions")) %>%
                             select(REPORT_ID, PT_NAME_ENG) %>%
-                            filter(PT_NAME_ENG == current_rxn),
-                          n=-1)
+                            filter(PT_NAME_ENG == current_rxn)
                       } else {
-                        as.data.frame(
                           tbl(hcopen,sql("SELECT * FROM cv_reactions")) %>%
-                            select(REPORT_ID, PT_NAME_ENG),
-                          n=-1)
+                            select(REPORT_ID, PT_NAME_ENG)
                       }
   # When generic, brand & reaction names are unspecified, count number of UNIQUE reports associated with each OUTCOME_ENG 
   #    (some REPORT_ID maybe duplicated due to multiple REPORT_DRUG_ID & DRUG_PRODUCT_ID which means that patient has diff dosage/freq)
   reactions_tab_master <- cv_drug_product_ingredients_rxn %>%
                           left_join(cv_report_drug_rxn) %>%
                             filter(REPORT_ID != "NA") %>% # some drugs will have the same ingredient but the durg name doesn't match current_brand
-                          left_join(cv_reports_sorted_rxn) %>%
-                            filter(as.character(DATINTRECEIVED_CLEAN) != "NA")%>% # DATINTRECEIVED_CLEAN = NA means there're not within searched time range
                           left_join(cv_reactions_rxn) %>%
-                            filter(PT_NAME_ENG != "NA")
-  
+                            filter(PT_NAME_ENG != "NA") %>%
+                          as.data.frame()
+  reactions_tab_master <- reactions_tab_master %>%
+                          left_join(cv_reports_sorted_rxn) %>%
+                            filter(as.character(DATINTRECEIVED_CLEAN) != "NA")# DATINTRECEIVED_CLEAN = NA means there're not within searched time range 
+                        
   #return(as.data.frame(reactions_tab_master)) 
 }
 
