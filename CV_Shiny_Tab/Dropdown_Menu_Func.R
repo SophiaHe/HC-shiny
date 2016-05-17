@@ -40,11 +40,15 @@ toprxn_func <- function(n){
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   
   cv_reports_dm <- tbl(hcopen, sql("SELECT * FROM cv_reports")) %>% select(REPORT_ID)
+  #cv_reports_dm1 <- as.data.frame(cv_reports_dm,n=-1)
   
   cv_reactions_dm <- tbl(hcopen, sql("SELECT * FROM cv_reactions")) %>% select(REPORT_ID, PT_NAME_ENG)
+  #cv_reactions_dm1 <- as.data.frame(cv_reactions_dm,n=-1)
   
   rxn_master <- cv_reports_dm %>% left_join(cv_reactions_dm) 
   
   toprxn <- dplyr::summarise(group_by(rxn_master, PT_NAME_ENG),count=n_distinct(REPORT_ID)) %>% as.data.frame()
   toprxn_final <- toprxn %>% arrange(desc(count)) %>% top_n(n) %>% select(PT_NAME_ENG)
+  
+  #test <- cv_reports_dm1 %>% left_join(cv_reactions_dm1)
 }
