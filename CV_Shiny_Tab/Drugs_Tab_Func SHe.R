@@ -58,51 +58,37 @@ drugs_tab <- function(current_generic, current_brand,current_rxn, date_ini, date
   
   
   cv_drug_product_ingredients_drg <- if(is.na(current_generic) == FALSE){
-                                        as.data.frame(
                                           tbl(hcopen, sql("SELECT * FROM cv_drug_product_ingredients")) %>%
                                             select(DRUG_PRODUCT_ID, ACTIVE_INGREDIENT_NAME) %>%
-                                            filter(ACTIVE_INGREDIENT_NAME == current_generic),
-                                          n=-1)
+                                            filter(ACTIVE_INGREDIENT_NAME == current_generic)
                                       } else {
-                                        as.data.frame(
                                           tbl(hcopen, sql("SELECT * FROM cv_drug_product_ingredients")) %>%
-                                            select(DRUG_PRODUCT_ID, ACTIVE_INGREDIENT_NAME),
-                                          n=-1)
+                                            select(DRUG_PRODUCT_ID, ACTIVE_INGREDIENT_NAME)
                                       }
 
   
-  cv_report_drug_indication_drg <- as.data.frame(
-                                      tbl(hcopen,sql("SELECT * FROM cv_report_drug_indication")) %>%
-                                      select(REPORT_ID, DRUG_PRODUCT_ID, DRUGNAME, INDICATION_NAME_ENG),
-                                    n=-1)
+  cv_report_drug_indication_drg <- tbl(hcopen,sql("SELECT * FROM cv_report_drug_indication")) %>%
+                                      select(REPORT_ID, DRUG_PRODUCT_ID, DRUGNAME, INDICATION_NAME_ENG)
   
   cv_report_drug_drg <- if(is.na(current_brand) == FALSE){
-                          as.data.frame(
                             tbl(hcopen,sql("SELECT * FROM cv_report_drug")) %>%
                               select(REPORT_ID,DRUG_PRODUCT_ID,DRUGNAME) %>%
-                              filter(DRUGNAME == current_brand),
-                            n=-1)
+                              filter(DRUGNAME == current_brand)
                         } else {
-                          as.data.frame(
                             tbl(hcopen,sql("SELECT * FROM cv_report_drug")) %>%
-                              select(REPORT_ID,DRUG_PRODUCT_ID,DRUGNAME),
-                            n=-1)
+                              select(REPORT_ID,DRUG_PRODUCT_ID,DRUGNAME)
                         }
-  cv_report_drug_drg <- cv_report_drug_drg[order(cv_report_drug_drg$DRUG_PRODUCT_ID),]
+  # cv_report_drug_drg <- cv_report_drug_drg[order(cv_report_drug_drg$DRUG_PRODUCT_ID),]
   
 
   
   cv_reactions_drg <- if(is.na(current_rxn) == FALSE){
-                        as.data.frame(
                           tbl(hcopen,sql("SELECT * FROM cv_reactions")) %>%
                             select(REPORT_ID, PT_NAME_ENG) %>%
-                            filter(PT_NAME_ENG == current_rxn),
-                          n=-1)
+                            filter(PT_NAME_ENG == current_rxn)
                       } else {
-                        as.data.frame(
                           tbl(hcopen,sql("SELECT * FROM cv_reactions")) %>%
-                            select(REPORT_ID, PT_NAME_ENG),
-                          n=-1)
+                            select(REPORT_ID, PT_NAME_ENG)
                       }
   
   # cv_reactions_drg2[cv_reactions_drg2$PT_NAME_ENG == "Drug level increased",] should return zero outcome
@@ -118,11 +104,14 @@ drugs_tab <- function(current_generic, current_brand,current_rxn, date_ini, date
                             filter(REPORT_ID != "NA") %>%
                           left_join(cv_report_drug_indication_drg) %>% 
                             filter(INDICATION_NAME_ENG != "NA") %>%
-                          left_join(cv_reports_sorted_drg) %>%
-                            filter(as.character(DATINTRECEIVED_CLEAN) != "NA") %>% # DATINTRECEIVED_CLEAN = NA means there're not within searched time range
                           left_join(cv_reactions_drg) %>%
                             filter(PT_NAME_ENG != "NA") %>%
-                          distinct(REPORT_ID)
+                          distinct(REPORT_ID) %>%
+                          as.data.frame()
+  drugs_tab_indication <- drugs_tab_indication %>%
+                          left_join(cv_reports_sorted_drg) %>%
+                            filter(as.character(DATINTRECEIVED_CLEAN) != "NA") # DATINTRECEIVED_CLEAN = NA means there're not within searched time range
+                                                
   
   #return(as.data.frame(drugs_tab_indication))
 }
@@ -175,47 +164,35 @@ drugs_tab2 <- function(current_generic, current_brand,current_rxn, date_ini, dat
   
   # Used to generate Top 25 drugs (in addition to search item)
   cv_drug_product_ingredients_drg2 <- if(is.na(current_generic) == FALSE){
-                                        as.data.frame(
                                           tbl(hcopen, sql("SELECT * FROM cv_drug_product_ingredients")) %>%
                                             select(DRUG_PRODUCT_ID, ACTIVE_INGREDIENT_NAME) %>%
-                                            filter(ACTIVE_INGREDIENT_NAME != current_generic),
-                                          n=-1)
+                                            filter(ACTIVE_INGREDIENT_NAME != current_generic)
                                       } else {
-                                        as.data.frame(
                                           tbl(hcopen, sql("SELECT * FROM cv_drug_product_ingredients")) %>%
-                                            select(DRUG_PRODUCT_ID, ACTIVE_INGREDIENT_NAME),
-                                          n=-1)
+                                            select(DRUG_PRODUCT_ID, ACTIVE_INGREDIENT_NAME)
                                       }
   
   
   # Used to generate Top 25 drugs (in addition to search item)
   cv_report_drug_drg2 <- if(is.na(current_brand) == FALSE){
-                            as.data.frame(
                               tbl(hcopen,sql("SELECT * FROM cv_report_drug")) %>%
                                 select(REPORT_ID,DRUG_PRODUCT_ID,DRUGNAME) %>%
-                                filter(DRUGNAME != current_brand),
-                              n=-1)
+                                filter(DRUGNAME != current_brand)
                           } else {
-                            as.data.frame(
                               tbl(hcopen,sql("SELECT * FROM cv_report_drug")) %>%
-                                select(REPORT_ID,DRUG_PRODUCT_ID,DRUGNAME),
-                              n=-1)
+                                select(REPORT_ID,DRUG_PRODUCT_ID,DRUGNAME)
                           }
-  cv_report_drug_drg2 <- cv_report_drug_drg2[order(cv_report_drug_drg2$DRUG_PRODUCT_ID),]
+  #cv_report_drug_drg2 <- cv_report_drug_drg2[order(cv_report_drug_drg2$DRUG_PRODUCT_ID),]
   #cv_report_drug_drg2[cv_report_drug_drg2$DRUGNAME == "DILANTIN",] should return zero outcome
 
   
   cv_reactions_drg2 <- if(is.na(current_rxn) == FALSE){
-                          as.data.frame(
                             tbl(hcopen,sql("SELECT * FROM cv_reactions")) %>%
                               select(REPORT_ID, PT_NAME_ENG) %>%
-                              filter(PT_NAME_ENG != current_rxn),
-                            n=-1)
+                              filter(PT_NAME_ENG != current_rxn)
                         } else {
-                          as.data.frame(
                             tbl(hcopen,sql("SELECT * FROM cv_reactions")) %>%
-                              select(REPORT_ID, PT_NAME_ENG),
-                            n=-1)
+                              select(REPORT_ID, PT_NAME_ENG)
                         }
   # cv_reactions_drg2[cv_reactions_drg2$PT_NAME_ENG == "Drug level increased",] should return zero outcome
   
@@ -229,12 +206,14 @@ drugs_tab2 <- function(current_generic, current_brand,current_rxn, date_ini, dat
   drugs_tab_topdrg <- cv_drug_product_ingredients_drg2 %>%
                       left_join(cv_report_drug_drg2) %>%
                         filter(REPORT_ID != "NA") %>%
-                      left_join(cv_reports_sorted_drg) %>%
-                        filter(as.character(DATINTRECEIVED_CLEAN) != "NA") %>% # DATINTRECEIVED_CLEAN = NA means there're not within searched time range
                       left_join(cv_reactions_drg2) %>%
                         filter(PT_NAME_ENG != "NA") %>%
-                      distinct(REPORT_ID)
- 
+                      distinct(REPORT_ID) %>%
+                      as.data.frame()
+  drugs_tab_topdrg <- drugs_tab_topdrg %>%
+                      left_join(cv_reports_sorted_drg) %>%
+                        filter(as.character(DATINTRECEIVED_CLEAN) != "NA")# DATINTRECEIVED_CLEAN = NA means there're not within searched time range
+                   
   #return(head(as.data.frame(drugs_tab_topdrg)))
 }
 
