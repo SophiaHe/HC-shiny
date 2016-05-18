@@ -24,6 +24,9 @@ drugs_tab <- function(current_generic, current_brand,current_rxn, date_ini, date
   # connect to CV database
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   
+  date_ini <- ymd(date_ini)
+  date_end <- ymd(date_end)
+  
   # Import tables with particular search items
   cv_reports <- as.data.frame(tbl(hcopen, sql("SELECT * FROM cv_reports")),n=-1)
   cv_reports_sorted_drg <- if(is.na(date_ini) == FALSE & is.na(date_end) == FALSE){
@@ -101,17 +104,16 @@ drugs_tab <- function(current_generic, current_brand,current_rxn, date_ini, date
   #    (some REPORT_ID maybe duplicated due to multiple REPORT_DRUG_ID & DRUG_PRODUCT_ID which means that patient has diff dosage/freq) 
   drugs_tab_indication <- cv_drug_product_ingredients_drg %>%
                           left_join(cv_report_drug_drg) %>%
-                            filter(REPORT_ID != "NA") %>%
+                            filter(is.na(REPORT_ID) == FALSE) %>%
                           left_join(cv_report_drug_indication_drg) %>% 
                             filter(INDICATION_NAME_ENG != "NA") %>%
                           left_join(cv_reactions_drg) %>%
                             filter(PT_NAME_ENG != "NA") %>%
-                          distinct(REPORT_ID) %>%
                           as.data.frame()
   drugs_tab_indication <- drugs_tab_indication %>%
                           left_join(cv_reports_sorted_drg) %>%
-                            filter(as.character(DATINTRECEIVED_CLEAN) != "NA") # DATINTRECEIVED_CLEAN = NA means there're not within searched time range
-                                                
+                            filter(as.character(DATINTRECEIVED_CLEAN) != "NA")  %>% # DATINTRECEIVED_CLEAN = NA means there're not within searched time range
+                            distinct(REPORT_ID)                    
   
   #return(as.data.frame(drugs_tab_indication))
 }
@@ -128,6 +130,9 @@ date_end <- ymd("20001231")
 drugs_tab2 <- function(current_generic, current_brand,current_rxn, date_ini, date_end) { 
   # connect to CV database
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+  
+  date_ini <- ymd(date_ini)
+  date_end <- ymd(date_end)
   
   # Import tables with particular search items
   cv_reports <- as.data.frame(tbl(hcopen, sql("SELECT * FROM cv_reports")),n=-1)
@@ -205,15 +210,14 @@ drugs_tab2 <- function(current_generic, current_brand,current_rxn, date_ini, dat
   
   drugs_tab_topdrg <- cv_drug_product_ingredients_drg2 %>%
                       left_join(cv_report_drug_drg2) %>%
-                        filter(REPORT_ID != "NA") %>%
+                        filter(is.na(REPORT_ID) == FALSE) %>%
                       left_join(cv_reactions_drg2) %>%
-                        filter(PT_NAME_ENG != "NA") %>%
-                      distinct(REPORT_ID) %>%
+                        filter(PT_NAME_ENG != "NA")  %>%
                       as.data.frame()
   drugs_tab_topdrg <- drugs_tab_topdrg %>%
                       left_join(cv_reports_sorted_drg) %>%
-                        filter(as.character(DATINTRECEIVED_CLEAN) != "NA")# DATINTRECEIVED_CLEAN = NA means there're not within searched time range
-                   
+                        filter(as.character(DATINTRECEIVED_CLEAN) != "NA")  %>% # DATINTRECEIVED_CLEAN = NA means there're not within searched time range
+                        distinct(REPORT_ID) 
   #return(head(as.data.frame(drugs_tab_topdrg)))
 }
 
