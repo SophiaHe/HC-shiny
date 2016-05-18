@@ -19,6 +19,9 @@ patients_tab <- function(current_generic, current_brand,current_rxn, date_ini, d
   # connect to CV database
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   
+  date_ini <- ymd(date_ini)
+  date_end <- ymd(date_end)
+  
   # Import tables with particular search items with method to deal with unspecified search term
   cv_reports <- as.data.frame(tbl(hcopen, sql("SELECT * FROM cv_reports")),n=-1)
   cv_reports_sorted_pt <- if(is.na(date_ini) == FALSE & is.na(date_end) == FALSE){
@@ -82,7 +85,7 @@ patients_tab <- function(current_generic, current_brand,current_rxn, date_ini, d
   patients_tab_master <- cv_drug_product_ingredients_pt %>%
                         # left_join(cv_drug_product_ingredients_pt) %>%
                         left_join(cv_report_drug_pt) %>%
-                          filter(REPORT_ID != "NA") %>% # some drugs will have the same ingredient but the durg name doesn't match current_brand
+                          filter(is.na(REPORT_ID) == FALSE) %>% # some drugs will have the same ingredient but the durg name doesn't match current_brand
                         left_join(cv_reactions_pt) %>%
                           filter(PT_NAME_ENG != "NA") %>%
                         as.data.frame()

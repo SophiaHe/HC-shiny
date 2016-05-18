@@ -15,7 +15,8 @@
 reactions_tab <- function(current_generic, current_brand,current_rxn, date_ini, date_end) { 
   # connect to CV database
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
-  
+  date_ini <- ymd(date_ini)
+  date_end <- ymd(date_end)
   # Import tables with particular search items with method to deal with unspecified search term
   cv_reports <- as.data.frame(tbl(hcopen, sql("SELECT * FROM cv_reports")),n=-1)
   cv_reports_sorted_rxn <- if(is.na(date_ini) == FALSE & is.na(date_end) == FALSE){
@@ -79,7 +80,7 @@ reactions_tab <- function(current_generic, current_brand,current_rxn, date_ini, 
   #    (some REPORT_ID maybe duplicated due to multiple REPORT_DRUG_ID & DRUG_PRODUCT_ID which means that patient has diff dosage/freq)
   reactions_tab_master <- cv_drug_product_ingredients_rxn %>%
                           left_join(cv_report_drug_rxn) %>%
-                            filter(REPORT_ID != "NA") %>% # some drugs will have the same ingredient but the durg name doesn't match current_brand
+                            filter(is.na(REPORT_ID) == FALSE) %>% # some drugs will have the same ingredient but the durg name doesn't match current_brand
                           left_join(cv_reactions_rxn) %>%
                             filter(PT_NAME_ENG != "NA") %>%
                           as.data.frame()
