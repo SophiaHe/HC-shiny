@@ -9,7 +9,7 @@ library(plotly)
 library(shiny)
 library(DT)
 library(googleVis)
-library(openfda)
+# library(openfda)
 library(stringr)
 library(plyr)
 library(data.table)
@@ -94,8 +94,8 @@ server <- function(input, output) {
                                   NA,
                                   input$search_rxn)) 
     current_date_range <- isolate(input$searchDateRange)
-    date_ini <- paste(">=",input$current_date_range[1])
-    date_end <- paste("<=",input$current_date_range[2])
+    date_ini <- input$current_date_range[1]
+    date_end <- input$current_date_range[2]
     
     reports_tab_df <- reports_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
     return(reports_tab_df)
@@ -114,8 +114,8 @@ server <- function(input, output) {
                                   NA,
                                   input$search_rxn)) 
     current_date_range <- isolate(input$searchDateRange)
-    date_ini <- paste(">=",input$current_date_range[1])
-    date_end <- paste("<=",input$current_date_range[2])
+    date_ini <- input$current_date_range[1]
+    date_end <- input$current_date_range[2]
     
     patients_tab_df <- patients_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
     return(patients_tab_df)
@@ -134,8 +134,8 @@ server <- function(input, output) {
                                   NA,
                                   input$search_rxn)) 
     current_date_range <- isolate(input$searchDateRange)
-    date_ini <- paste(">=",input$current_date_range[1])
-    date_end <- paste("<=",input$current_date_range[2])
+    date_ini <- input$current_date_range[1]
+    date_end <- input$current_date_range[2]
     
     drug_tab_indc_df <- drugs_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
     return(drug_tab_indc_df)
@@ -154,8 +154,8 @@ server <- function(input, output) {
                                   NA,
                                   input$search_rxn)) 
     current_date_range <- isolate(input$searchDateRange)
-    date_ini <- paste(">=",input$current_date_range[1])
-    date_end <- paste("<=",input$current_date_range[2])
+    date_ini <- input$current_date_range[1]
+    date_end <- input$current_date_range[2]
     
     drug_tab_topdrg_df <- drugs_tab2(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
     return(drug_tab_topdrg_df)
@@ -174,8 +174,8 @@ server <- function(input, output) {
                                   NA,
                                   input$search_rxn)) 
     current_date_range <- isolate(input$searchDateRange)
-    date_ini <- paste(">=",input$current_date_range[1])
-    date_end <- paste("<=",input$current_date_range[2])
+    date_ini <- input$current_date_range[1]
+    date_end <- input$current_date_range[2]
     
     reactions_tab_df <- reactions_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
     return(reactions_tab_df)
@@ -194,15 +194,15 @@ server <- function(input, output) {
                                   NA,
                                   input$search_rxn)) 
     current_date_range <- isolate(input$searchDateRange)
-    date_ini <- paste(">=",input$current_date_range[1])
-    date_end <- paste("<=",input$current_date_range[2])
+    date_ini <- input$current_date_range[1]
+    date_end <- input$current_date_range[2]
     
-    reactions_tab_df <- data.table(names = c("Generic Name:", 
+    search_tab_df <- data.table(names = c("Generic Name:", 
                                              "Brand Name:", 
                                              "Adverse Reaction Term:",
                                              "Date Range:"),
                                    terms = c(current_generic,current_brand,current_rxn,paste(date_ini," to ", date_end)))
-    return(reactions_tab_df)
+    return(search_tab_df)
   })
   
   #current_generic = "a"
@@ -220,7 +220,7 @@ server <- function(input, output) {
   output$current_search <- renderTable({
     data <- cv_search_tab()
     
-    reactions_tab_df$terms[is.na(reactions_tab_df$terms) == TRUE] <- "Not Specified"
+    data$terms[is.na(data$terms) == TRUE] <- "Not Specified"
     
   }, include.rownames = FALSE, include.colnames = FALSE)
   
@@ -496,6 +496,9 @@ server <- function(input, output) {
   
   ################ Create Age Group histogram in Patient tab ##################   
   output$agehist <- renderPlotly({
+    data <- cv_patients_tab()
+    age_groups <- ddply(data, "AGE_GROUP_CLEAN",count_func)
+    
     age_groups_hist <- age_groups %>% 
       filter(AGE_GROUP_CLEAN != "Unknown") #exclude the unknown
     
@@ -593,7 +596,131 @@ server <- function(input, output) {
 #######################################################################################
 
 
-# add UI code HERE !!!!!!!!!
+############ UI for shiny ################
+ui <- dashboardPage(
+  dashboardHeader(title = "Shiny FAERS (v0.04)"),
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Reports", tabName = "reportdata", icon = icon("hospital-o")),
+      menuItem("Patients", tabName = "patientdata", icon = icon("user-md")),
+      menuItem("Drugs", tabName = "drugdata", icon = icon("flask")),
+      menuItem("Reactions", tabName = "rxndata", icon = icon("heart-o")),
+      menuItem("About", tabName = "aboutinfo", icon = icon("info"))
+    ),
+    selectizeInput("search_generic", 
+                   "Generic Name (Active Ingredient)", 
+                   topingd$ACTIVE_INGREDIENT_NAME,
+                   options = list(create = TRUE,
+                                  placeholder = 'Please select an option below',
+                                  onInitialize = I('function() { this.setValue(""); }'))),
+    selectizeInput("search_brand", 
+                   "Brand Name (US Trade Name)",
+                   topbrands$DRUGNAME,
+                   options = list(create = TRUE,
+                                  placeholder = 'Please select an option below',
+                                  onInitialize = I('function() { this.setValue(""); }'))),
+    selectizeInput("search_rxn", 
+                   "Adverse Event Term",
+                   toprxns$PT_NAME_ENG,
+                   options = list(create = TRUE,
+                                  placeholder = 'Please select an option below',
+                                  onInitialize = I('function() { this.setValue(""); }'))),
+    dateRangeInput("searchDateRange", 
+                   "Date Range", 
+                   start = "2000-01-01", 
+                   startview = "year"),
+    actionButton("searchButton", "Search"),
+    tags$br(),
+    tags$h3(strong("Current Query:")),
+    tableOutput("current_search")
+  ),
+  
+  dashboardBody(
+    fluidRow(
+      box(plotlyOutput(outputId = "timeplot"),
+          tags$br(),
+          tags$p("Reports by month from Canada Vigilance Adverse Reaction Online Database. 
+                 Trendline is a local non-parametric regression calculated with the LOESS model. 
+                 The shaded area is an approximation of the 95% confidence interval of the regression.")
+          #tags$p("Search URL:"),
+          #uiOutput(outputId = "search_url"),
+          #width = 12
+          )
+      ),
+    tabItems(
+      tabItem(tabName = "reportdata",
+              fluidRow(
+                box(htmlOutput("reporterplot"), 
+                    tags$br(),
+                    tags$p("Qualification of the person who filed the report."),
+                    tags$p("Unknown is the number of reports without the primarysource.qualification field."),
+                    title = tags$h2("Reporter"), width = 4),
+                box(htmlOutput("seriousplot"), 
+                    tags$br(),
+                    tags$p("Reports marked as serious."),
+                    title = tags$h2("Serious reports"), width = 4),
+                box(htmlOutput("seriousreasonsplot"), 
+                    tags$br(),
+                    tags$p("Total sums to more than 100% because reports can be marked serious for multiple reasons."),
+                    title = tags$h2("Reasons for serious reports"), width = 4)
+                #box(htmlOutput("countryplot"), 
+                #tags$br(),
+                #tags$p("Country the reaction(s) occurred in. This is not necessarily the same country the report was received from."),
+                #title = tags$h2("Country"), width = 4)
+              )
+      ),
+      tabItem(tabName = "patientdata",
+              fluidRow(
+                box(htmlOutput("sexplot"),
+                    tags$br(),
+                    tags$p("Unknown includes both reports explicitly marked unknown and reports with no gender information."),
+                    title = tags$h2("Gender"), width = 4),
+                box(htmlOutput("agegroupplot"),
+                    tags$br(),
+                    tags$p("Unknown includes reports with no age information."), 
+                    title = tags$h2("Age Groups"), width = 4),
+                box(plotlyOutput("agehist"), title = tags$h2("Age Histogram"), width = 4)
+              )
+      ),
+      tabItem(tabName = "drugdata",
+              fluidRow(
+                box(plotOutput("indicationplot"),
+                    tags$br(),
+                    tags$p("This plot includes all indications for all drugs associated with the matching reports.
+                           The open.fda.gov search API does not allow searching or filtering within drugs.
+                           The search query filters unique reports, which may have one or more drugs associated with them.
+                           It is not currently possible to search for only those indications associated with a specific drug.
+                           "), width = 4),
+                box(plotOutput("drugplot"),
+                    tags$br(),
+                    tags$p("This plot includes all drugs associated with the matching reports, except the search term.
+                           The open.fda.gov search API does not allow searching or filtering within drugs.
+                           The search query filters unique reports, which may have one or more drugs associated with them.
+                           It is not currently possible to retrieve correlations between drugs."), width = 4),
+                box(plotOutput("drugclassplot"),
+                    tags$br(),
+                    tags$p("This plot includes all drug classes associated with the matching reports, including the search term.
+                           The total number of instances for each class will be geater 
+                           than the number of reports when reports include more than one drug of the same class.
+                           The open.fda.gov search API does not allow searching or filtering within drugs.
+                           The search query filters unique reports, which may have one or more drugs associated with them.
+                           It is not currently possible to retrieve correlations between drugs."), width = 4)
+              )
+      ),
+      tabItem(tabName = "rxndata",
+              fluidRow(
+                box(htmlOutput("outcomeplot"), title = tags$h2("Outcomes (all reactions)"))
+              )
+      ),
+      tabItem(tabName = "aboutinfo",
+              tags$p("Data provided by the Canada Vigilance Adverse Reaction Online Database (http://www.hc-sc.gc.ca/dhp-mps/medeff/databasdon/index-eng.php)"),
+              tags$h2("About page goes here")
+      )
+    )
+  ), 
+  skin = "blue"
+)
+###########################################################################
 
 
 shinyApp(ui, server)
