@@ -7,8 +7,8 @@ library(testthat)
 #  current_generic <- NA
 #  current_brand <- NA
 #  current_rxn <- "Nausea"
-#  date_ini <- NA 
-#  date_end <- NA
+  date_ini <- "1973-01-01" 
+  date_end <- Sys.Date()
 # "sulfisoxazole" "GANTRISIN" ymd("20000101") ymd("19730601")
 
 #Function to merge tabled used for REPORTS TAB, which will go in server code, used after current_generic,brand,rxn & date_range are defined
@@ -26,17 +26,17 @@ reports_tab <- function(current_generic, current_brand,current_rxn, date_ini, da
  
   
   # Import tables with particular search items with method to deal with unspecified search term
-  cv_reports <- tbl(hcopen, "cv_reports")
-  date_ini <- ymd(date_ini)
-  date_end <- ymd(date_end)
-  
+  cv_reports <- tbl(hcopen, "cv_reports") 
+  date_ini <- as.POSIXct(ymd(date_ini))
+  date_end <- as.POSIXct(ymd(date_end))
+  #escape.POSIXt <- dplyr:::escape.Date
   
   cv_reports_sorted_rp <- 
           cv_reports %>%
             select(REPORT_ID, SERIOUSNESS_ENG, REPORTER_TYPE_ENG, DEATH, DISABILITY, CONGENITAL_ANOMALY,LIFE_THREATENING, HOSP_REQUIRED, 
                    OTHER_MEDICALLY_IMP_COND, DATINTRECEIVED_CLEAN) %>%
-            filter(DATINTRECEIVED_CLEAN > date_ini) %>%
-            filter(DATINTRECEIVED_CLEAN < date_end)
+            filter(DATINTRECEIVED_CLEAN >= date_ini) %>%
+            filter(DATINTRECEIVED_CLEAN <= date_end)
   
   
                           
@@ -76,9 +76,8 @@ reports_tab <- function(current_generic, current_brand,current_rxn, date_ini, da
                           filter(is.na(REPORT_ID) == FALSE) %>% # some drugs will have the same ingredient but the durg name doesn't match current_brand
                         left_join(cv_reports_sorted_rp) %>%
                           filter(as.character(DATINTRECEIVED_CLEAN) != "NA") %>%                    
-                        left_join(cv_reactions_rp) %>%
-                          filter(PT_NAME_ENG == current_rxn) %>%
-                        as.data.frame(n=-1)
+                        left_join(cv_reactions_rp) %>% 
+                          filter(is.na(PT_NAME_ENG) == FALSE)
   
   #return(as.data.frame(reports_tab_master))  
 }
