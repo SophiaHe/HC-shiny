@@ -1,17 +1,19 @@
 library(dplyr)
 library(plyr)
+library(lubridate)
+n =1000
 
 ############## Function to create top 1000 terms included in the dropdown menu #############
 topingd_func <- function(n){
   # connect to CV database
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   
-  cv_reports_dm <- tbl(hcopen, sql("SELECT * FROM cv_reports")) %>% select(REPORT_ID)
+  cv_reports_dm <- tbl(hcopen,"cv_reports") %>% select(REPORT_ID)
   
-  cv_report_drug_dm <- tbl(hcopen, sql("SELECT * FROM cv_report_drug")) %>%
+  cv_report_drug_dm <- tbl(hcopen, "cv_report_drug") %>%
     select(REPORT_ID, DRUG_PRODUCT_ID)
   
-  cv_drug_product_ingredients_dm <- tbl(hcopen, sql("SELECT * FROM cv_drug_product_ingredients")) %>%
+  cv_drug_product_ingredients_dm <- tbl(hcopen, "cv_drug_product_ingredients") %>%
     select(DRUG_PRODUCT_ID, ACTIVE_INGREDIENT_NAME)
   
   ingd_master <-  cv_reports_dm %>% left_join(cv_report_drug_dm) %>% left_join(cv_drug_product_ingredients_dm) 
@@ -24,9 +26,9 @@ topdrug_func <- function(n){
   # connect to CV database
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   
-  cv_reports_dm <- tbl(hcopen, sql("SELECT * FROM cv_reports")) %>% select(REPORT_ID)
+  cv_reports_dm <- tbl(hcopen, "cv_reports") %>% select(REPORT_ID)
   
-  cv_report_drug_dm <- tbl(hcopen, sql("SELECT * FROM cv_report_drug")) %>%
+  cv_report_drug_dm <- tbl(hcopen, "cv_report_drug") %>%
     select(REPORT_ID, DRUGNAME)
   
   drugs_master <-cv_reports_dm %>% left_join(cv_report_drug_dm) 
@@ -39,10 +41,10 @@ toprxn_func <- function(n){
   # connect to CV database
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   
-  cv_reports_dm <- tbl(hcopen, sql("SELECT * FROM cv_reports")) %>% select(REPORT_ID)
+  cv_reports_dm <- tbl(hcopen, "cv_reports") %>% select(REPORT_ID)
   #cv_reports_dm1 <- as.data.frame(cv_reports_dm,n=-1)
   
-  cv_reactions_dm <- tbl(hcopen, sql("SELECT * FROM cv_reactions")) %>% select(REPORT_ID, PT_NAME_ENG)
+  cv_reactions_dm <- tbl(hcopen, "cv_reactions") %>% select(REPORT_ID, PT_NAME_ENG)
   #cv_reactions_dm1 <- as.data.frame(cv_reactions_dm,n=-1)
   
   rxn_master <- cv_reports_dm %>% left_join(cv_reactions_dm) 
@@ -52,3 +54,11 @@ toprxn_func <- function(n){
   
   #test <- cv_reports_dm1 %>% left_join(cv_reactions_dm1)
 }
+
+
+
+
+
+
+
+  
