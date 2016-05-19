@@ -93,7 +93,7 @@ ui <- dashboardPage(
                                   onInitialize = I('function() { this.setValue(""); }'))),
     dateRangeInput("searchDateRange", 
                    "Date Range", 
-                   start = "2000-01-01", 
+                   start = "1973-01-01", 
                    end = Sys.Date(),
                    startview = "year",
                    format = "yyyy-mm-dd"),
@@ -149,11 +149,17 @@ hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hco
 #options(shiny.error = browser)
 options(shiny.trace = TRUE, shiny.reactlog=TRUE)
 
+# Temperary solution: fetch all tables to local and run temp_reports_tab_func on them
+cv_reports <- tbl(hcopen, "cv_reports") 
+cv_drug_product_ingredients <-  tbl(hcopen, "cv_drug_product_ingredients")
+cv_report_drug <- tbl(hcopen,"cv_report_drug")
+cv_reactions <- tbl(hcopen,"cv_reactions") 
 
 ############### Server Functions ###################
 server <- function(input, output) {
   # Data frame generate reactive function to be used to assign: data <- cv_reports_tab() 
-  source("Reports_Tab_Func SHe.R")
+  setwd("~/CV_Shiny_Tab")
+  source("temp_reports_tab_func SHe.R")
   #source("Patients_Tab_Func SHe.R")
   #source("Drugs_Tab_Func SHe.R")
   #source("Reactions_Tab_Func SHe.R")
@@ -162,56 +168,29 @@ server <- function(input, output) {
     input$searchButton
     #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_generic <- isolate(ifelse(input$search_generic == "",
-                                      NA,
+                                      "acetaminophen",
                                       input$search_generic)) 
     current_brand <- isolate(ifelse(input$search_brand == "",
-                                    NA,
+                                    "TYLENOL",
                                     input$search_brand)) 
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
                                   input$search_rxn)) 
     current_date_range <- isolate(input$searchDateRange)
-    date_ini <- input$current_date_range[1]
-    date_end <- input$current_date_range[2]
-    
-    date_ini <- as.character(date_ini)
-    date_end <- as.character(date_end)
+    #date_ini <- ifelse(input$current_date_range[1]== "","19730101", input$current_date_range[1])
+    #date_end <- ifelse(input$current_date_range[2]== "","20150101", input$current_date_range[2])
+
   
     reports_tab_df <- reports_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
     
     return(reports_tab_df)
   })
   
-  cv_reports_default_tab <- reactive({
-    input$searchButton
-    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
-    current_generic <- isolate(ifelse(input$search_generic == "",
-                                      NA,
-                                      input$search_generic)) 
-    current_brand <- isolate(ifelse(input$search_brand == "",
-                                    NA,
-                                    input$search_brand)) 
-    current_rxn <- isolate(ifelse(input$search_rxn == "",
-                                  NA,
-                                  input$search_rxn)) 
-    current_date_range <- isolate(input$searchDateRange)
-    date_ini <- input$current_date_range[1]
-    date_end <- input$current_date_range[2]
-    
-    date_ini <- as.character(date_ini)
-    date_end <- as.character(date_end)
-    
-    default_master <- reports_default_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
-    
-    return(default_master)
-  })
-  
-  
   cv_search_tab <- reactive({
     input$searchButton
     #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_generic <- isolate(ifelse(input$search_generic == "",
-                                      NA,
+                                      "acetaminophen",
                                       input$search_generic)) 
     current_brand <- isolate(ifelse(input$search_brand == "",
                                     NA,
@@ -220,17 +199,17 @@ server <- function(input, output) {
                                   NA,
                                   input$search_rxn)) 
     current_date_range <- isolate(input$searchDateRange)
-    date_ini <- input$current_date_range[1]
-    date_end <- input$current_date_range[2]
+    date_ini <- ifelse(input$current_date_range[1]== "","19730101", input$current_date_range[1])
+    date_end <- ifelse(input$current_date_range[2]== "","20150101", input$current_date_range[2])
     
-    date_ini <- ymd(date_ini)
-    date_end <- ymd(date_end)
+    #date_ini <- ymd(date_ini)
+    #date_end <- ymd(date_end)
     
     search_tab_df <- data.frame(names = c("Generic Name:", 
                                           "Brand Name:", 
                                           "Adverse Reaction Term:",
                                           "Date Range:"),
-                                terms = c(current_generic,current_brand,current_rxn,paste(date_ini," to ", date_end)),
+                                terms = c(current_generic,current_brand,current_rxn,paste(current_date_range, collapse=" to ")),
                                 stringsAsFactors=FALSE)
     search_tab_df$terms[is.na(search_tab_df$terms) == TRUE] <- "Not Specified"
     return(search_tab_df)
@@ -243,11 +222,9 @@ server <- function(input, output) {
   
   ############### Create time plot #####################
   output$timeplot <- renderPlotly({
-    if(is.na(current_generic)==TRUE & is.na(current_brand)==TRUE & is.na(current_rxn)==TRUE){
-      data <- cv_reports_default_tab() 
-    } else {
+
       data <- cv_reports_tab()
-    }
+    
     
     # specify the title of time plot based on reactive choice
     title <- ifelse(!is.na(current_generic), current_generic, "NA")
@@ -259,7 +236,7 @@ server <- function(input, output) {
   
   ############### Create Reporter pie chart ##############  
   output$reporterplot <- renderGvis({
-    # data <- cv_reports_tab()
+     data <- cv_reports_tab()
     # test
     # data <- reports_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
     
@@ -283,7 +260,7 @@ server <- function(input, output) {
   
   ################ Create Serious reports pie chart ##################   
   output$seriousplot <- renderGvis({
-    # data <- cv_reports_tab()
+     data <- cv_reports_tab()
     
     serious_df <- data %>%
       select(REPORT_ID,SERIOUSNESS_ENG)
@@ -303,7 +280,7 @@ server <- function(input, output) {
   
   ################ Create Serious Reason Reports chart ################## 
   output$seriousreasonsplot <- renderGvis({
-    # data <- cv_reports_tab()
+    data <- cv_reports_tab()
     # test
     # data <- reports_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
     
