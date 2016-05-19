@@ -1,3 +1,71 @@
+library(shinydashboard)
+library(jsonlite)
+library(lubridate)
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(magrittr)
+library(plotly)
+library(shiny)
+library(DT)
+library(googleVis)
+# library(openfda)
+library(stringr)
+library(plyr)
+library(data.table)
+
+
+########## Codes to fetch top 1000 specific results to be used in dropdown menu ##########
+
+#data frames used in DRUGS tab for top 1000 drugs with most reports submitted
+#Fetch top 1000 most-reported ingredients
+setwd("~/CV_Shiny_Tab")
+source("Dropdown_Menu_Func.R")
+topingd <- topingd_func(n=1000)
+
+#Fetch top 1000 most-reported brand/drug names
+topbrands <- topdrug_func(n=1000)
+
+#Count the number of times each unique value of field patient.reaction.reactionmeddrapt occurs in records matching the search parameters.
+toprxns <- toprxn_func(n=1000)
+
+
+############### Create function ###################
+# function to plot adverse reaction plot
+# adrplot_test <- reports_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
+#adrplot_df <- reports_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
+
+count_func <- function(x){
+  n <- tally(distinct(x,REPORT_ID))
+}
+
+
+adrplot <- function(adrplot_test, plottitle){
+  adrplot_test <- adrplot_test %>% 
+    mutate( plot_date = floor_date(ymd(adrplot_test$DATINTRECEIVED_CLEAN), "month"))
+  nreports <- ddply(adrplot_test,"plot_date",count_func)
+  total_reports <- sum(nreports$n)
+  
+  
+  plottitle <- paste(plottitle, " (", total_reports, " reports)") 
+  #plottitle <- paste0(str_replace_all(plottitle, "\\+", " "), " (", total_reports, " reports)") 
+  
+  plot <- nreports %>%
+    ggplot(aes(x = plot_date, y = n)) +
+    geom_line(stat = "identity", size = 0.1) +
+    stat_smooth(method = "loess", size = 0.1) +
+    ggtitle(plottitle) + 
+    xlab("Month") + 
+    ylab("Number of Reports") +
+    theme_bw() +
+    theme(plot.title = element_text(lineheight=.8, face="bold"))
+}
+
+format1K <- function(x){
+  x/1000
+}
+
+
 ############ UI for REPORT Tab shiny ################
 ui <- dashboardPage(
   dashboardHeader(title = "Shiny FAERS (v0.04)"),
@@ -26,7 +94,9 @@ ui <- dashboardPage(
     dateRangeInput("searchDateRange", 
                    "Date Range", 
                    start = "2000-01-01", 
-                   startview = "year"),
+                   end = Sys.Date(),
+                   startview = "year",
+                   format = "yyyy-mm-dd"),
     actionButton("searchButton", "Search"),
     tags$br(),
     tags$h3(strong("Current Query:")),
@@ -76,13 +146,17 @@ ui <- dashboardPage(
 # connect to CV database
 hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
 
+#options(shiny.error = browser)
+options(shiny.trace = TRUE, shiny.reactlog=TRUE)
+
+
 ############### Server Functions ###################
 server <- function(input, output) {
   # Data frame generate reactive function to be used to assign: data <- cv_reports_tab() 
   source("Reports_Tab_Func SHe.R")
-  source("Patients_Tab_Func SHe.R")
-  source("Drugs_Tab_Func SHe.R")
-  source("Reactions_Tab_Func SHe.R")
+  #source("Patients_Tab_Func SHe.R")
+  #source("Drugs_Tab_Func SHe.R")
+  #source("Reactions_Tab_Func SHe.R")
   
   cv_reports_tab <- reactive({
     input$searchButton
@@ -100,9 +174,38 @@ server <- function(input, output) {
     date_ini <- input$current_date_range[1]
     date_end <- input$current_date_range[2]
     
+    date_ini <- as.character(date_ini)
+    date_end <- as.character(date_end)
+  
     reports_tab_df <- reports_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
+    
     return(reports_tab_df)
   })
+  
+  cv_reports_default_tab <- reactive({
+    input$searchButton
+    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    current_generic <- isolate(ifelse(input$search_generic == "",
+                                      NA,
+                                      input$search_generic)) 
+    current_brand <- isolate(ifelse(input$search_brand == "",
+                                    NA,
+                                    input$search_brand)) 
+    current_rxn <- isolate(ifelse(input$search_rxn == "",
+                                  NA,
+                                  input$search_rxn)) 
+    current_date_range <- isolate(input$searchDateRange)
+    date_ini <- input$current_date_range[1]
+    date_end <- input$current_date_range[2]
+    
+    date_ini <- as.character(date_ini)
+    date_end <- as.character(date_end)
+    
+    default_master <- reports_default_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
+    
+    return(default_master)
+  })
+  
   
   cv_search_tab <- reactive({
     input$searchButton
@@ -120,26 +223,31 @@ server <- function(input, output) {
     date_ini <- input$current_date_range[1]
     date_end <- input$current_date_range[2]
     
-    search_tab_df <- data.table(names = c("Generic Name:", 
+    date_ini <- ymd(date_ini)
+    date_end <- ymd(date_end)
+    
+    search_tab_df <- data.frame(names = c("Generic Name:", 
                                           "Brand Name:", 
                                           "Adverse Reaction Term:",
                                           "Date Range:"),
-                                terms = c(current_generic,current_brand,current_rxn,paste(date_ini," to ", date_end)))
+                                terms = c(current_generic,current_brand,current_rxn,paste(date_ini," to ", date_end)),
+                                stringsAsFactors=FALSE)
+    search_tab_df$terms[is.na(search_tab_df$terms) == TRUE] <- "Not Specified"
     return(search_tab_df)
   })
   
-  ############## Construct Current_Query_Table for generic name, brand name, adverse reaction term & date range searched ############
+############## Construct Current_Query_Table for generic name, brand name, adverse reaction term & date range searched ############
   output$current_search <- renderTable({
-    data <- cv_search_tab()
-    
-    data$terms[is.na(data$terms) == TRUE] <- "Not Specified"
-    
+    data_search <- cv_search_tab()
   }, include.rownames = FALSE, include.colnames = FALSE)
   
   ############### Create time plot #####################
   output$timeplot <- renderPlotly({
-    
-    data <- cv_reports_tab()
+    if(is.na(current_generic)==TRUE & is.na(current_brand)==TRUE & is.na(current_rxn)==TRUE){
+      data <- cv_reports_default_tab() 
+    } else {
+      data <- cv_reports_tab()
+    }
     
     # specify the title of time plot based on reactive choice
     title <- ifelse(!is.na(current_generic), current_generic, "NA")
@@ -151,7 +259,7 @@ server <- function(input, output) {
   
   ############### Create Reporter pie chart ##############  
   output$reporterplot <- renderGvis({
-    data <- cv_reports_tab()
+    # data <- cv_reports_tab()
     # test
     # data <- reports_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
     
@@ -175,7 +283,7 @@ server <- function(input, output) {
   
   ################ Create Serious reports pie chart ##################   
   output$seriousplot <- renderGvis({
-    data <- cv_reports_tab()
+    # data <- cv_reports_tab()
     
     serious_df <- data %>%
       select(REPORT_ID,SERIOUSNESS_ENG)
@@ -195,7 +303,7 @@ server <- function(input, output) {
   
   ################ Create Serious Reason Reports chart ################## 
   output$seriousreasonsplot <- renderGvis({
-    data <- cv_reports_tab()
+    # data <- cv_reports_tab()
     # test
     # data <- reports_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
     
