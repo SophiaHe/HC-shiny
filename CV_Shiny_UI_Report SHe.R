@@ -91,15 +91,25 @@ ui <- dashboardPage(
                    options = list(create = TRUE,
                                   placeholder = 'Please select an option below',
                                   onInitialize = I('function() { this.setValue(""); }'))),
-    dateRangeInput("searchDateRange", 
-                   "Date Range", 
-                   start = "1973-01-01", 
-                   end = Sys.Date(),
-                   startview = "year",
-                   format = "yyyy-mm-dd"),
+    #dateRangeInput("searchDateRange", 
+    #               "Date Range", 
+    #               start = "1973-01-01", 
+    #               end = Sys.Date(),
+    #               startview = "year",
+    #               format = "yyyy-mm-dd"),
+    dateInput("search_date_ini",
+              label = 'Date initial input: yyyy-mm-dd',
+              value = "1973-01-01"
+    ),
+    
+    dateInput("search_date_end",
+              label = 'Date end input: yyyy-mm-dd',
+              value = Sys.Date()
+    ),
+    
     actionButton("searchButton", "Search"),
     tags$br(),
-    tags$h3(strong("Current Query:")),
+    tags$h3(strong("Current Search:")),
     tableOutput("current_search")
   ),
   
@@ -176,9 +186,11 @@ server <- function(input, output) {
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
                                   input$search_rxn)) 
-    current_date_range <- isolate(input$searchDateRange)
-    #date_ini <- ifelse(input$current_date_range[1]== "","19730101", input$current_date_range[1])
-    #date_end <- ifelse(input$current_date_range[2]== "","20150101", input$current_date_range[2])
+    date_ini <- isolate(input$search_date_ini)
+    date_end <- isolate(input$search_date_end)
+    #current_date_range <- isolate(input$searchDateRange)
+    #date_ini <- ifelse(input$searchDateRange[1]== "",as.POSIXct(ymd("19730101")), input$searchDateRange[1])
+    #date_end <- ifelse(input$searchDateRange[2]== "",as.POSIXct(ymd("20150101")), input$searchDateRange[2])
 
   
     reports_tab_df <- reports_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
@@ -193,23 +205,21 @@ server <- function(input, output) {
                                       "acetaminophen",
                                       input$search_generic)) 
     current_brand <- isolate(ifelse(input$search_brand == "",
-                                    NA,
+                                    "TYLENOL",
                                     input$search_brand)) 
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
                                   input$search_rxn)) 
-    current_date_range <- isolate(input$searchDateRange)
-    date_ini <- ifelse(input$current_date_range[1]== "","19730101", input$current_date_range[1])
-    date_end <- ifelse(input$current_date_range[2]== "","20150101", input$current_date_range[2])
-    
-    #date_ini <- ymd(date_ini)
-    #date_end <- ymd(date_end)
+    #current_date_range <- isolate(input$searchDateRange)
+    date_ini <- isolate(input$search_date_ini)
+    date_end <- isolate(input$search_date_end)
+
     
     search_tab_df <- data.frame(names = c("Generic Name:", 
                                           "Brand Name:", 
                                           "Adverse Reaction Term:",
                                           "Date Range:"),
-                                terms = c(current_generic,current_brand,current_rxn,paste(current_date_range, collapse=" to ")),
+                                terms = c(current_generic,current_brand,current_rxn,paste(date_ini, " to ",date_end)),
                                 stringsAsFactors=FALSE)
     search_tab_df$terms[is.na(search_tab_df$terms) == TRUE] <- "Not Specified"
     return(search_tab_df)
@@ -227,7 +237,7 @@ server <- function(input, output) {
     
     
     # specify the title of time plot based on reactive choice
-    title <- ifelse(!is.na(current_generic), current_generic, "NA")
+    # title <- ifelse(!is.na(current_generic), current_generic, "NA")
     plottitle <- paste("Drug Adverse Event Reports for", title)
     p <- adrplot(data, plottitle)
     #print(p)
