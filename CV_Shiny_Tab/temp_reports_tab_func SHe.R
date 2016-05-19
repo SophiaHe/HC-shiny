@@ -7,8 +7,8 @@ reports_tab <- function(current_generic, current_brand,current_rxn, date_ini, da
   
   # Import tables with particular search items with method to deal with unspecified search term
   
-  #date_ini <- as.POSIXct(ymd(date_ini))
-  #date_end <- as.POSIXct(ymd(date_end))
+  date_ini <- as.POSIXct(ymd("19730101"))
+  date_end <- as.POSIXct(ymd("20150101"))
   
   #date_ini <- "19730101"
   #date_end <- "20150101"
@@ -63,7 +63,7 @@ reports_tab <- function(current_generic, current_brand,current_rxn, date_ini, da
     left_join(cv_reports_sorted_rp) %>%
     filter(as.character(DATINTRECEIVED_CLEAN) != "NA") %>%                    
     left_join(cv_reactions_rp) %>% 
-    filter(is.na(PT_NAME_ENG) == FALSE) %>% as.data.frame() 
+    filter(is.na(PT_NAME_ENG) == FALSE) %>% as.data.frame(n=-1) 
   
   #return(as.data.frame(reports_tab_master))  
 }
