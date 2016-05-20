@@ -43,14 +43,15 @@ count_func <- function(x){
 adrplot <- function(adrplot_test, plottitle){
   adrplot_test <- adrplot_test %>% 
     select(REPORT_ID,DATINTRECEIVED_CLEAN) %>%
-    mutate( plot_date = floor_date(ymd(adrplot_test$DATINTRECEIVED_CLEAN), "month"))
+    mutate( plot_date = floor_date(ymd(adrplot_test$DATINTRECEIVED_CLEAN), "month")) %>%
+    select(REPORT_ID,plot_date)
   
   nreports <- ddply(adrplot_test,"plot_date",count_func)
   total_reports <- sum(nreports$n)
   
   
   plottitle <- paste(plottitle, " (", total_reports, " reports)") 
-  #plottitle <- paste0(str_replace_all(plottitle, "\\+", " "), " (", total_reports, " reports)") 
+ 
   
   plot <- nreports %>%
     ggplot(aes(x = plot_date, y = n)) +
@@ -61,6 +62,10 @@ adrplot <- function(adrplot_test, plottitle){
     ylab("Number of Reports") +
     theme_bw() +
     theme(plot.title = element_text(lineheight=.8, face="bold"))
+    
+ # ggplotly(p= plot)
+  
+  
 }
 
 format1K <- function(x){
@@ -73,7 +78,8 @@ ui <- dashboardPage(
   dashboardHeader(title = "Shiny FAERS (v0.04)"),
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Reports", tabName = "reportdata", icon = icon("hospital-o"))
+      menuItem("Reports", tabName = "reportdata", icon = icon("hospital-o")), 
+      menuItem("Patients", tabName = "patientdata", icon = icon("user-md"))
     ),
     selectizeInput("search_generic", 
                    "Generic Name (Active Ingredient)", 
@@ -113,7 +119,7 @@ ui <- dashboardPage(
     tags$br(),
     tags$h3(strong("Current Search:")),
     tableOutput("current_search")
-  ),
+  ), 
   
   dashboardBody(
     fluidRow(
@@ -121,12 +127,10 @@ ui <- dashboardPage(
           tags$br(),
           tags$p("Reports by month from Canada Vigilance Adverse Reaction Online Database. 
                  Trendline is a local non-parametric regression calculated with the LOESS model. 
-                 The shaded area is an approximation of the 95% confidence interval of the regression.")
-          #tags$p("Search URL:"),
-          #uiOutput(outputId = "search_url"),
-          #width = 12
-      )
-    ),
+                 The shaded area is an approximation of the 95% confidence interval of the regression."),
+          width = 12
+          )
+      ),
     tabItems(
       tabItem(tabName = "reportdata",
               fluidRow(
@@ -144,13 +148,27 @@ ui <- dashboardPage(
                     tags$p("Total sums to more than 100% because reports can be marked serious for multiple reasons."),
                     title = tags$h2("Reasons for serious reports"), width = 4),
                 box(htmlOutput("outputReports"), 
-                tags$br(),
-                #tags$p("Country the reaction(s) occurred in. This is not necessarily the same country the report was received from."),
-                title = tags$h2("dataset used"), width = 4)
+                    tags$br(),
+                    #tags$p("Country the reaction(s) occurred in. This is not necessarily the same country the report was received from."),
+                    title = tags$h2("dataset used"), width = 4)
+              )
+      ),
+      tabItem(tabName = "patientdata",
+              fluidRow(
+                box(htmlOutput("sexplot"),
+                    tags$br(),
+                    tags$p("Unknown includes both reports explicitly marked unknown and reports with no gender information."),
+                    title = tags$h2("Gender"), width = 4),
+                box(htmlOutput("agegroupplot"),
+                    tags$br(),
+                    tags$p("Unknown includes reports with no age information."), 
+                    title = tags$h2("Age Groups"), width = 4),
+                box(plotlyOutput("agehist"), title = tags$h2("Age Histogram"), width = 4)
               )
       )
     )
-  )
+  ), 
+  skin = "blue"
 )
 
 
@@ -182,7 +200,7 @@ server <- function(input, output) {
                                       "acetaminophen",
                                       input$search_generic)) 
     current_brand <- isolate(ifelse(input$search_brand == "",
-                                    "TYLENOL",
+                                    NA,
                                     input$search_brand)) 
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
@@ -212,7 +230,7 @@ server <- function(input, output) {
                                       "acetaminophen",
                                       input$search_generic)) 
     current_brand <- isolate(ifelse(input$search_brand == "",
-                                    "TYLENOL",
+                                    NA,
                                     input$search_brand)) 
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
@@ -232,7 +250,31 @@ server <- function(input, output) {
     return(search_tab_df)
   })
   
-############## Construct Current_Query_Table for generic name, brand name, adverse reaction term & date range searched ############
+  cv_patients_tab <- reactive({
+    input$searchButton
+    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    current_generic <- isolate(ifelse(input$search_generic == "",
+                                      "acetaminophen",
+                                      input$search_generic)) 
+    current_brand <- isolate(ifelse(input$search_brand == "",
+                                    NA,
+                                    input$search_brand)) 
+    current_rxn <- isolate(ifelse(input$search_rxn == "",
+                                  NA,
+                                  input$search_rxn)) 
+    date_ini <- isolate(as.POSIXct(input$search_date_ini))
+    date_end <- isolate(as.POSIXct(input$search_date_end))
+    #date_ini <- ifelse(input$searchDateRange[1]== "",as.POSIXct(ymd("19730101")), input$searchDateRange[1])
+    #date_end <- ifelse(input$searchDateRange[2]== "",as.POSIXct(ymd("20150101")), input$searchDateRange[2])
+    
+    setwd("~/CV_Shiny_Tab")
+    source("Patients_Tab_Func SHe.R")
+    patients_tab_df <- patients_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
+    
+    return(patients_tab_df)
+  })
+  
+  ############## Construct Current_Query_Table for generic name, brand name, adverse reaction term & date range searched ############
   output$current_search <- renderTable({
     data_search <- cv_search_tab()
   }, include.rownames = FALSE, include.colnames = FALSE)
@@ -241,13 +283,14 @@ server <- function(input, output) {
   output$timeplot <- renderPlotly({
 
       data <- cv_reports_tab()
+      generic_selected <- data$ACTIVE_INGREDIENT_NAME[1] 
     
     
     # specify the title of time plot based on reactive choice
-    title <- ifelse(!is.na(current_generic), current_generic, "NA")
+    title <- ifelse(!is.na(generic_selected), generic_selected, "NA")
     plottitle <- paste("Drug Adverse Event Reports for", title)
     p <- adrplot(adrplot_test = data, plottitle = plottitle)
-    #print(p)
+    print(p)
     ggplotly(p)
   })
   
@@ -456,6 +499,62 @@ server <- function(input, output) {
                                 bar = list(groupWidth =  '90%')
                  )
     )
+  })
+  
+  ################ Create Gender pie chart in Patient tab ##################  
+  output$sexplot <- renderGvis({
+    data <- cv_patients_tab()
+    
+    # replace blank in GENDER_ENG with character "Unknown" & convert it to factor in order to build freq table
+    data$GENDER_ENG[data$GENDER_ENG == ""] <- "Unknown"
+    data$GENDER_ENG <- as.factor(data$GENDER_ENG)
+    
+    sex_results <- ddply(data, "GENDER_ENG",count_func)
+    
+    gvisPieChart(sex_results, 
+                 labelvar = "GENDER_ENG",
+                 numvar = "count", 
+                 options = list(pieHole = 0.4, pieSliceText="percentage", fontSize=12))
+  })
+  
+  ################ Create Age Group pie chart in Patient tab ##################      
+  output$agegroupplot <- renderGvis({
+    data <- cv_patients_tab()
+   
+    # Age groups frequency table
+    age_groups <- ddply(data, "AGE_GROUP_CLEAN",count_func)
+    
+    gvisPieChart(age_groups, 
+                 labelvar = "AGE_GROUP_CLEAN",
+                 numvar = "n", 
+                 options = list(pieHole = 0.4, pieSliceText='percentage', fontSize=12) )
+  })
+  
+  ################ Create Age Group histogram in Patient tab ##################   
+  output$agehist <- renderPlotly({
+    data <- cv_patients_tab()
+    age_groups <- ddply(data, "AGE_GROUP_CLEAN",count_func)
+    
+    age_groups_hist <- age_groups %>% 
+      filter(AGE_GROUP_CLEAN != "Unknown") #exclude the unknown
+    
+    unknown <- age_groups$n[age_groups$AGE_GROUP_CLEAN == "Unknown"]
+    
+    plottitle <- paste0("Histogram of Patient Ages")
+    if(unknown > 0) plottitle <- paste0(plottitle, "<br>(", unknown, "Reports with Unknown Age Group Excluded)")
+    
+    hist <- ggplot(age_groups_hist, aes(x = AGE_GROUP_CLEAN,  weight=n, fill=AGE_GROUP_CLEAN)) +
+            geom_bar()+
+            ggtitle(plottitle) + 
+            xlab("Age at onset (years)") + 
+            ylab("Number of Reports") +
+            theme_bw() +
+            theme(plot.title = element_text(lineheight=.8, size = rel(1),face="bold")) + 
+            theme(axis.title.x = element_text(size = rel(0.8)))
+    
+    print(hist)
+    ggplotly(hist)
+    
   })
 
 }
