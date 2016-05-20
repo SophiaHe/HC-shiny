@@ -1,21 +1,19 @@
+# Import tables with particular search items with method to deal with unspecified search term
+
+date_ini <- as.POSIXct(ymd("19730101"))
+date_end <- as.POSIXct(ymd("20160520"))
+
+#date_ini <- "19730101"
+#date_end <- "20150101"
+current_generic <- "acetaminophen"
+current_brand <- "TYLENOL"
+current_rxn<-NA
+#escape.POSIXt <- dplyr:::escape.Date
+
 
 reports_tab <- function(current_generic, current_brand,current_rxn, date_ini, date_end) { 
   # connect to CV database
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
-  
-  
-  
-  # Import tables with particular search items with method to deal with unspecified search term
-  
-  date_ini <- as.POSIXct(ymd("19730101"))
-  date_end <- as.POSIXct(ymd("20150101"))
-  
-  #date_ini <- "19730101"
-  #date_end <- "20150101"
-  #current_generic <- "acetaminophen"
-  #current_brand <- NA
-  #current_rxn<-"Rash"
-  #escape.POSIXt <- dplyr:::escape.Date
   
   cv_reports_sorted_rp <- 
     cv_reports %>%
@@ -65,5 +63,7 @@ reports_tab <- function(current_generic, current_brand,current_rxn, date_ini, da
     left_join(cv_reactions_rp) %>% 
     filter(is.na(PT_NAME_ENG) == FALSE) %>% as.data.frame(n=-1) 
   
-  #return(as.data.frame(reports_tab_master))  
+  return(reports_tab_master) 
 }
+
+# a <- reports_tab(current_generic="acetaminophen",current_brand="TYLENOL",current_rxn=NA,date_ini="19730101",date_end="20160520")
