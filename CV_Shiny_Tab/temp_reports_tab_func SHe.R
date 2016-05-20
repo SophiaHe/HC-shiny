@@ -1,13 +1,13 @@
 # Import tables with particular search items with method to deal with unspecified search term
 
-date_ini <- as.POSIXct(ymd("19730101"))
-date_end <- as.POSIXct(ymd("20160520"))
+#date_ini <- as.POSIXct(ymd("19730101"))
+#date_end <- as.POSIXct(ymd("20160520"))
 
 #date_ini <- "19730101"
 #date_end <- "20150101"
-current_generic <- "acetaminophen"
-current_brand <- "TYLENOL"
-current_rxn<-NA
+#current_generic <- "acetaminophen"
+#current_brand <- "TYLENOL"
+#current_rxn<-NA
 #escape.POSIXt <- dplyr:::escape.Date
 
 
@@ -56,12 +56,12 @@ reports_tab <- function(current_generic, current_brand,current_rxn, date_ini, da
   }
   
   reports_tab_master <- cv_drug_product_ingredients_rp %>%
-    left_join(cv_report_drug_rp) %>%
-    filter(is.na(REPORT_ID) == FALSE) %>% # some drugs will have the same ingredient but the durg name doesn't match current_brand
-    left_join(cv_reports_sorted_rp) %>%
-    filter(as.character(DATINTRECEIVED_CLEAN) != "NA") %>%                    
-    left_join(cv_reactions_rp) %>% 
-    filter(is.na(PT_NAME_ENG) == FALSE) %>% as.data.frame(n=-1) 
+                        left_join(cv_report_drug_rp) %>%
+                        filter(is.na(REPORT_ID) == FALSE) %>% # some drugs will have the same ingredient but the durg name doesn't match current_brand
+                        left_join(cv_reports_sorted_rp) %>%
+                        filter(as.character(DATINTRECEIVED_CLEAN) != "NA") %>%                    
+                        left_join(cv_reactions_rp) %>% 
+                        filter(is.na(PT_NAME_ENG) == FALSE) %>% as.data.frame(n=-1) 
   
   return(reports_tab_master) 
 }
