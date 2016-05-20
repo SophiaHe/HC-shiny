@@ -42,7 +42,9 @@ count_func <- function(x){
 
 adrplot <- function(adrplot_test, plottitle){
   adrplot_test <- adrplot_test %>% 
+    select(REPORT_ID,DATINTRECEIVED_CLEAN) %>%
     mutate( plot_date = floor_date(ymd(adrplot_test$DATINTRECEIVED_CLEAN), "month"))
+  
   nreports <- ddply(adrplot_test,"plot_date",count_func)
   total_reports <- sum(nreports$n)
   
@@ -140,11 +142,11 @@ ui <- dashboardPage(
                 box(htmlOutput("seriousreasonsplot"), 
                     tags$br(),
                     tags$p("Total sums to more than 100% because reports can be marked serious for multiple reasons."),
-                    title = tags$h2("Reasons for serious reports"), width = 4)
-                #box(htmlOutput("countryplot"), 
-                #tags$br(),
+                    title = tags$h2("Reasons for serious reports"), width = 4),
+                box(htmlOutput("outputReports"), 
+                tags$br(),
                 #tags$p("Country the reaction(s) occurred in. This is not necessarily the same country the report was received from."),
-                #title = tags$h2("Country"), width = 4)
+                title = tags$h2("dataset used"), width = 4)
               )
       )
     )
@@ -168,8 +170,7 @@ cv_reactions <- tbl(hcopen,"cv_reactions")
 ############### Server Functions ###################
 server <- function(input, output) {
   # Data frame generate reactive function to be used to assign: data <- cv_reports_tab() 
-  setwd("~/CV_Shiny_Tab")
-  source("temp_reports_tab_func SHe.R")
+  #setwd("~/CV_Shiny_Tab")
   #source("Patients_Tab_Func SHe.R")
   #source("Drugs_Tab_Func SHe.R")
   #source("Reactions_Tab_Func SHe.R")
@@ -186,16 +187,22 @@ server <- function(input, output) {
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
                                   input$search_rxn)) 
-    date_ini <- isolate(input$search_date_ini)
-    date_end <- isolate(input$search_date_end)
+    date_ini <- isolate(as.POSIXct(input$search_date_ini))
+    date_end <- isolate(as.POSIXct(input$search_date_end))
     #current_date_range <- isolate(input$searchDateRange)
     #date_ini <- ifelse(input$searchDateRange[1]== "",as.POSIXct(ymd("19730101")), input$searchDateRange[1])
     #date_end <- ifelse(input$searchDateRange[2]== "",as.POSIXct(ymd("20150101")), input$searchDateRange[2])
 
-  
+    setwd("~/CV_Shiny_Tab")
+    source("temp_reports_tab_func SHe.R")
     reports_tab_df <- reports_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
     
     return(reports_tab_df)
+  })
+  
+  # sample datasets of what is being graphed/used
+  output$outputReports <- renderTable({
+    cv_reports_tab()[1:4,c("ACTIVE_INGREDIENT_NAME","DRUGNAME","DATINTRECEIVED_CLEAN","PT_NAME_ENG")]
   })
   
   cv_search_tab <- reactive({
@@ -237,9 +244,9 @@ server <- function(input, output) {
     
     
     # specify the title of time plot based on reactive choice
-    # title <- ifelse(!is.na(current_generic), current_generic, "NA")
+    title <- ifelse(!is.na(current_generic), current_generic, "NA")
     plottitle <- paste("Drug Adverse Event Reports for", title)
-    p <- adrplot(data, plottitle)
+    p <- adrplot(adrplot_test = data, plottitle = plottitle)
     #print(p)
     ggplotly(p)
   })
@@ -254,7 +261,7 @@ server <- function(input, output) {
       select(REPORT_ID, REPORTER_TYPE_ENG)
     
     # Use ddply & count_func to count number of unique report for each REPORTER_TYPE_ENG
-    reporter_results<-as.data.frame(ddply(reporter_df,"REPORTER_TYPE_ENG",count_func))
+    reporter_results<-ddply(reporter_df,"REPORTER_TYPE_ENG",count_func)
     reporter_results$REPORTER_TYPE_ENG[reporter_results$REPORTER_TYPE_ENG == ""] <- "Not Specified"
     
     gvisPieChart(reporter_results, 
@@ -444,7 +451,7 @@ server <- function(input, output) {
                                 bars = 'horizontal',
                                 #hAxis = "{format:'percent'}",
                                 axes= "x: {
-                                0: { side: 'top', label: 'Percentage'} 
+                                0: { side: 'top', label: 'Count'} 
   }",
                                 bar = list(groupWidth =  '90%')
                  )
