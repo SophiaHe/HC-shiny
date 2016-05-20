@@ -113,9 +113,9 @@ drugs_tab <- function(current_generic, current_brand,current_rxn, date_ini, date
   drugs_tab_indication <- drugs_tab_indication %>%
                           left_join(cv_reports_sorted_drg) %>%
                             filter(as.character(DATINTRECEIVED_CLEAN) != "NA")  %>% # DATINTRECEIVED_CLEAN = NA means there're not within searched time range
-                            distinct(REPORT_ID)                    
+                            distinct(REPORT_ID) %>% as.data.frame()                    
   
-  #return(as.data.frame(drugs_tab_indication))
+  return(drugs_tab_indication)
 }
 
 ########################################################################################################################
