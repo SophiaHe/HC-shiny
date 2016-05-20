@@ -64,11 +64,11 @@ ui <- dashboardPage(
                 box(htmlOutput("seriousreasonsplot"), 
                     tags$br(),
                     tags$p("Total sums to more than 100% because reports can be marked serious for multiple reasons."),
-                    title = tags$h2("Reasons for serious reports"), width = 4)
-                #box(htmlOutput("countryplot"), 
-                #tags$br(),
-                #tags$p("Country the reaction(s) occurred in. This is not necessarily the same country the report was received from."),
-                #title = tags$h2("Country"), width = 4)
+                    title = tags$h2("Reasons for serious reports"), width = 4),
+                box(htmlOutput("outputReports"), 
+                    tags$br(),
+                    #tags$p("Country the reaction(s) occurred in. This is not necessarily the same country the report was received from."),
+                    title = tags$h2("dataset used"), width = 4)
               )
       ),
       tabItem(tabName = "patientdata",
