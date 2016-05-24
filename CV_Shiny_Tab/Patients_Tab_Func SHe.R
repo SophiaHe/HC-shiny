@@ -61,7 +61,7 @@ patients_tab <- function(current_generic, current_brand,current_rxn, date_ini, d
                           filter(as.character(DATINTRECEIVED_CLEAN) != "NA") %>%                    
                         left_join(cv_reactions_pt) %>%
                           filter(is.na(PT_NAME_ENG) == FALSE) %>%
-                        as.data.frame(n=-1)
+                        as.data.table(n=-1)
 
   
   return(patients_tab_master) 
