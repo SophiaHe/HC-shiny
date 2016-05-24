@@ -15,7 +15,7 @@ library(plyr)
 library(data.table)
 
 
-########## Codes to fetch top 1000 specific results to be used in dropdown menu ##########
+########## Codes to fetch top 1000 specific results to be used in dropdown menu ###############
 
 #data frames used in DRUGS tab for top 1000 drugs with most reports submitted
 #Fetch top 1000 most-reported ingredients
@@ -78,8 +78,11 @@ ui <- dashboardPage(
   dashboardHeader(title = "Shiny FAERS (v0.04)"),
   dashboardSidebar(
     sidebarMenu(
+      menuItem("Drugs", tabName = "drugdata", icon = icon("flask")),
       menuItem("Reports", tabName = "reportdata", icon = icon("hospital-o")), 
-      menuItem("Patients", tabName = "patientdata", icon = icon("user-md"))
+      menuItem("Patients", tabName = "patientdata", icon = icon("user-md")),
+      menuItem("Reactions", tabName = "rxndata", icon = icon("heart-o"))
+
     ),
     selectizeInput("search_generic", 
                    "Generic Name (Active Ingredient)", 
@@ -146,11 +149,7 @@ ui <- dashboardPage(
                 box(htmlOutput("seriousreasonsplot"), 
                     tags$br(),
                     tags$p("Total sums to more than 100% because reports can be marked serious for multiple reasons."),
-                    title = tags$h2("Reasons for serious reports"), width = 4),
-                box(htmlOutput("outputReports"), 
-                    tags$br(),
-                    #tags$p("Country the reaction(s) occurred in. This is not necessarily the same country the report was received from."),
-                    title = tags$h2("dataset used"), width = 4)
+                    title = tags$h2("Reasons for serious reports"), width = 4)
               )
       ),
       tabItem(tabName = "patientdata",
@@ -165,7 +164,33 @@ ui <- dashboardPage(
                     title = tags$h2("Age Groups"), width = 4),
                 box(plotlyOutput("agehist"), title = tags$h2("Age Histogram"), width = 4)
               )
-      )
+      ),
+      tabItem(tabName = "drugdata",
+              fluidRow(
+                box(plotOutput("indicationplot"),
+                    tags$br(),
+                    tags$p("This plot includes all indications for all drugs associated with the matching reports.
+                           The open.fda.gov search API does not allow searching or filtering within drugs.
+                           The search query filters unique reports, which may have one or more drugs associated with them.
+                           It is not currently possible to search for only those indications associated with a specific drug.
+                           "), width = 4),
+                box(plotOutput("drugplot"),
+                    tags$br(),
+                    tags$p("This plot includes all drugs associated with the matching reports, except the search term.
+                           The open.fda.gov search API does not allow searching or filtering within drugs.
+                           The search query filters unique reports, which may have one or more drugs associated with them.
+                           It is not currently possible to retrieve correlations between drugs."), width = 4),
+                box(htmlOutput("outputReports"), 
+                    tags$br(),
+                    #tags$p("Country the reaction(s) occurred in. This is not necessarily the same country the report was received from."),
+                    title = tags$h2("dataset used"), width = 4)
+              )
+      ),
+      tabItem(tabName = "rxndata",
+              fluidRow(
+                box(htmlOutput("outcomeplot"), title = tags$h2("Outcomes (all reactions)"))
+              )
+      ) # more tabs added here!
     )
   ), 
   skin = "blue"
@@ -179,11 +204,12 @@ hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hco
 #options(shiny.error = browser)
 options(shiny.trace = TRUE, shiny.reactlog=TRUE)
 
-# Temperary solution: fetch all tables to local and run temp_reports_tab_func on them
+# Temperary solution: fetch all tables to local and run functions on them
 cv_reports <- tbl(hcopen, "cv_reports") 
 cv_drug_product_ingredients <-  tbl(hcopen, "cv_drug_product_ingredients")
 cv_report_drug <- tbl(hcopen,"cv_report_drug")
 cv_reactions <- tbl(hcopen,"cv_reactions") 
+cv_report_drug_indication <- tbl(hcopen,"cv_report_drug_indication")
 
 ############### Server Functions ###################
 server <- function(input, output) {
@@ -212,17 +238,18 @@ server <- function(input, output) {
     #date_end <- ifelse(input$searchDateRange[2]== "",as.POSIXct(ymd("20150101")), input$searchDateRange[2])
 
     setwd("~/CV_Shiny_Tab")
-    source("temp_reports_tab_func SHe.R")
+    source("temp_Reports_Tab_Func SHe.R")
     reports_tab_df <- reports_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
     
     return(reports_tab_df)
   })
   
   # sample datasets of what is being graphed/used
-  output$outputReports <- renderTable({
-    cv_reports_tab()[1:4,c("ACTIVE_INGREDIENT_NAME","DRUGNAME","DATINTRECEIVED_CLEAN","PT_NAME_ENG")]
-  })
+  #output$outputReports <- renderTable({
+  #  cv_reports_tab()[1:4,c("ACTIVE_INGREDIENT_NAME","DRUGNAME","DATINTRECEIVED_CLEAN","PT_NAME_ENG")]
+  #})
   
+  hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   cv_search_tab <- reactive({
     input$searchButton
     #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
@@ -250,6 +277,7 @@ server <- function(input, output) {
     return(search_tab_df)
   })
   
+  hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   cv_patients_tab <- reactive({
     input$searchButton
     #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
@@ -269,10 +297,106 @@ server <- function(input, output) {
     
     setwd("~/CV_Shiny_Tab")
     source("Patients_Tab_Func SHe.R")
+    
     patients_tab_df <- patients_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
     
     return(patients_tab_df)
   })
+  
+  hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+  cv_drug_tab_topdrg <- reactive({
+    input$searchButton
+    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    current_generic <- isolate(ifelse(input$search_generic == "",
+                                      "acetaminophen",
+                                      input$search_generic)) 
+    current_brand <- isolate(ifelse(input$search_brand == "",
+                                    NA,
+                                    input$search_brand)) 
+    current_rxn <- isolate(ifelse(input$search_rxn == "",
+                                  NA,
+                                  input$search_rxn)) 
+    date_ini <- isolate(as.POSIXct(input$search_date_ini))
+    date_end <- isolate(as.POSIXct(input$search_date_end))
+    
+    setwd("~/CV_Shiny_Tab")
+    source("Drugs_Tab_Func SHe.R")
+    
+    drugs_tab_df <- drugs_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
+    
+    #test <- drugs_tab(current_generic="acetaminophen",current_brand=NA,current_rxn=NA,date_ini=ymd("19730601"),date_end=ymd("20001231"))
+    #test1 <- setDF(test)
+    #test2 <- dplyr::summarise(group_by(test, DRUGNAME),count=n_distinct(REPORT_ID))
+    #test3 <- test2 %>% arrange(desc(count)) %>% top_n(n=25)
+    
+    #drugs_tab_df <- setDF(drugs_tab_df)
+    #drugs <- ddply(drugs_tab_df,"DRUGNAME", count_func) 
+    
+    #drugs_tab_df <- tbl_df(drugs_tab_df)
+    #drugs <-  dplyr::summarise(group_by(drugs_tab_df, DRUGNAME),count=n_distinct(REPORT_ID))
+    #drugs_sorted<- drugs %>% arrange(desc(count)) %>% top_n(n=25)
+    
+    drugs <- ddply(drugs_tab_df,"DRUGNAME", count_func) 
+    drugs_sorted <- drugs[order(-n),] 
+    
+    return(drugs_sorted)
+  })
+  
+  hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+  cv_drug_tab_indc <- reactive({
+    input$searchButton
+    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    current_generic <- isolate(ifelse(input$search_generic == "",
+                                      "acetaminophen",
+                                      input$search_generic)) 
+    current_brand <- isolate(ifelse(input$search_brand == "",
+                                    NA,
+                                    input$search_brand)) 
+    current_rxn <- isolate(ifelse(input$search_rxn == "",
+                                  NA,
+                                  input$search_rxn)) 
+    date_ini <- isolate(as.POSIXct(input$search_date_ini))
+    date_end <- isolate(as.POSIXct(input$search_date_end))
+    
+    setwd("~/CV_Shiny_Tab")
+    source("Drugs_Tab_Func SHe.R")
+    
+    drugs_tab_df2 <- drugs_tab2(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
+    #drugs_tab_df2 <- setDF(drugs_tab_df2)
+    
+    
+    
+    #drugs_tab_df2 <- tbl_df(drugs_tab_df2)
+    #indications <- dplyr::summarise(group_by(drugs_tab_df2, INDICATION_NAME_ENG),count=n_distinct(REPORT_ID))
+    #indications_sorted <- indications %>% arrange(desc(n)) %>% top_n(n=25)
+    
+    return(drugs_tab_df2)
+  })
+  
+  hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+  cv_reactions_tab <- reactive({
+    input$searchButton
+    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    current_generic <- isolate(ifelse(input$search_generic == "",
+                                      "acetaminophen",
+                                      input$search_generic)) 
+    current_brand <- isolate(ifelse(input$search_brand == "",
+                                    NA,
+                                    input$search_brand)) 
+    current_rxn <- isolate(ifelse(input$search_rxn == "",
+                                  NA,
+                                  input$search_rxn)) 
+    date_ini <- isolate(as.POSIXct(input$search_date_ini))
+    date_end <- isolate(as.POSIXct(input$search_date_end))
+    
+    setwd("~/CV_Shiny_Tab")
+    source("Reactions_Tab_Func SHe.R")
+    
+    reactions_tab_df <- reactions_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
+   
+    return(reactions_tab_df)
+  })
+  
   
   ############## Construct Current_Query_Table for generic name, brand name, adverse reaction term & date range searched ############
   output$current_search <- renderTable({
@@ -556,7 +680,69 @@ server <- function(input, output) {
     ggplotly(hist)
     
   })
+  
+  ################ Create drug plots in Drug tab ################## 
+  output$drugplot <- renderPlot({
+    
+    data <- cv_drug_tab_topdrg()
+    # test
+    # data <-drugs_tab2(current_generic="phenytoin",current_brand=NA,current_rxn="Drug level increased",date_ini=ymd("19650101"),date_end=ymd("20151231"))
 
+    p <- ggplot(data[1:25,], aes(x = DRUGNAME, y = n, fill = DRUGNAME)) + 
+      geom_bar(stat = "identity") + 
+      scale_x_discrete(limits = rev(data$DRUGNAME[1:25])) + 
+      coord_flip() +
+      ggtitle("Top 25 Drugs (in addition to search term)") +
+      xlab("Drug (generic name)") + 
+      ylab("Number of Reports (thousands)") +
+      theme_bw() +
+      theme(plot.title = element_text(lineheight=.8, face="bold"), 
+            legend.position = "none") +
+      scale_y_continuous(labels = format1K)
+    p
+  })
+  
+  output$indicationplot <- renderPlot({
+    data <- cv_drug_tab_indc()
+    # test
+    # data <-drugs_tab(current_generic="phenytoin",current_brand="DILANTIN",current_rxn=NA,date_ini=ymd("19650101"),date_end=ymd("20151231"))
+    
+    indications <- ddply(data,"INDICATION_NAME_ENG", count_func) 
+    indications_sorted <- indications[order(-n),] 
+    
+    p <- ggplot(indications_sorted[1:25,], aes(x = INDICATION_NAME_ENG, y = n, fill = INDICATION_NAME_ENG)) + 
+      geom_bar(stat = "identity") + 
+      scale_x_discrete(limits = rev(indications_sorted$INDICATION_NAME_ENG[1:25])) + 
+      coord_flip() +
+      ggtitle("Top 25 Indications (All Drugs)") +
+      xlab("Indication") + 
+      ylab("Number (thousands)") +
+      theme_bw() +
+      theme(plot.title = element_text(lineheight=.8, face="bold"), 
+            legend.position = "none") +
+      scale_y_continuous(labels = format1K)
+    p
+  })
+  
+  # sample datasets of what is being graphed/used
+  output$outputReports <- renderTable({
+    cv_drug_tab_indc()
+  })
+  
+  ################ Create Outcomes(all reactions) pie chart in Reaction tab ################## 
+  output$outcomeplot <- renderGvis({
+    data <- cv_reactions_tab()
+    
+    #test
+    # data <- reactions_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
+    
+    outcome_results <- ddply(data, "OUTCOME_ENG",count_func)
+    
+    gvisPieChart(outcome_results, 
+                 labelvar = "OUTCOME_ENG",
+                 numvar = "n", 
+                 options = list(pieHole = 0.4))
+  })
 }
 
 shinyApp(ui, server)
