@@ -322,24 +322,14 @@ server <- function(input, output) {
     setwd("~/CV_Shiny_Tab")
     source("Drugs_Tab_Func SHe.R")
     
-    drugs_tab_df <- drugs_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
+    drugs_tab_df2 <- drugs_tab2(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
     
-    #test <- drugs_tab(current_generic="acetaminophen",current_brand=NA,current_rxn=NA,date_ini=ymd("19730601"),date_end=ymd("20001231"))
-    #test1 <- setDF(test)
-    #test2 <- dplyr::summarise(group_by(test, DRUGNAME),count=n_distinct(REPORT_ID))
-    #test3 <- test2 %>% arrange(desc(count)) %>% top_n(n=25)
     
-    #drugs_tab_df <- setDF(drugs_tab_df)
     #drugs <- ddply(drugs_tab_df,"DRUGNAME", count_func) 
+    #drugs_sorted <- drugs[order(desc(drugs$n)),] 
+    #drugs_sorted <- drugs %>% arrange(desc(n)) %>% top_n(25)
     
-    #drugs_tab_df <- tbl_df(drugs_tab_df)
-    #drugs <-  dplyr::summarise(group_by(drugs_tab_df, DRUGNAME),count=n_distinct(REPORT_ID))
-    #drugs_sorted<- drugs %>% arrange(desc(count)) %>% top_n(n=25)
-    
-    drugs <- ddply(drugs_tab_df,"DRUGNAME", count_func) 
-    drugs_sorted <- drugs[order(-n),] 
-    
-    return(drugs_sorted)
+    return(drugs_tab_df2)
   })
   
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
@@ -361,7 +351,7 @@ server <- function(input, output) {
     setwd("~/CV_Shiny_Tab")
     source("Drugs_Tab_Func SHe.R")
     
-    drugs_tab_df2 <- drugs_tab2(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
+    drugs_tab_df <- drugs_tab(current_generic=current_generic,current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
     #drugs_tab_df2 <- setDF(drugs_tab_df2)
     
     
@@ -370,7 +360,7 @@ server <- function(input, output) {
     #indications <- dplyr::summarise(group_by(drugs_tab_df2, INDICATION_NAME_ENG),count=n_distinct(REPORT_ID))
     #indications_sorted <- indications %>% arrange(desc(n)) %>% top_n(n=25)
     
-    return(drugs_tab_df2)
+    return(drugs_tab_df)
   })
   
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
@@ -687,10 +677,13 @@ server <- function(input, output) {
     data <- cv_drug_tab_topdrg()
     # test
     # data <-drugs_tab2(current_generic="phenytoin",current_brand=NA,current_rxn="Drug level increased",date_ini=ymd("19650101"),date_end=ymd("20151231"))
-
-    p <- ggplot(data[1:25,], aes(x = DRUGNAME, y = n, fill = DRUGNAME)) + 
+    drugs <-  dplyr::summarise(group_by(data, DRUGNAME),count=n_distinct(REPORT_ID))
+    drugs_sorted<- drugs %>% arrange(desc(count)) %>% top_n(n=25)
+    
+    library(scales)
+    p <- ggplot(drugs_sorted, aes(x = DRUGNAME, y = n, fill = DRUGNAME)) + 
       geom_bar(stat = "identity") + 
-      scale_x_discrete(limits = rev(data$DRUGNAME[1:25])) + 
+      scale_x_discrete(limits = rev(drugs_sorted$DRUGNAME[1:25])) + 
       coord_flip() +
       ggtitle("Top 25 Drugs (in addition to search term)") +
       xlab("Drug (generic name)") + 
@@ -698,7 +691,7 @@ server <- function(input, output) {
       theme_bw() +
       theme(plot.title = element_text(lineheight=.8, face="bold"), 
             legend.position = "none") +
-      scale_y_continuous(labels = format1K)
+      scale_y_continuous(limits=  c(0, NA))
     p
   })
   
@@ -707,27 +700,32 @@ server <- function(input, output) {
     # test
     # data <-drugs_tab(current_generic="phenytoin",current_brand="DILANTIN",current_rxn=NA,date_ini=ymd("19650101"),date_end=ymd("20151231"))
     
-    indications <- ddply(data,"INDICATION_NAME_ENG", count_func) 
-    indications_sorted <- indications[order(-n),] 
+    #indications <- ddply(data,"INDICATION_NAME_ENG", count_func) 
+    #indications_sorted <- indications[order(desc(indications$n)),]
+    #indications_sorted <- indications_sorted %>% top_n(n=25) 
     
-    p <- ggplot(indications_sorted[1:25,], aes(x = INDICATION_NAME_ENG, y = n, fill = INDICATION_NAME_ENG)) + 
+    indications <-  dplyr::summarise(group_by(data, INDICATION_NAME_ENG),count=n_distinct(REPORT_ID))
+    indications_sorted<- indications %>% arrange(desc(count)) %>% top_n(n=25)
+    
+    library(scales)
+    p <- ggplot(indications_sorted, aes(x = INDICATION_NAME_ENG, y = n, fill = INDICATION_NAME_ENG)) + 
       geom_bar(stat = "identity") + 
-      scale_x_discrete(limits = rev(indications_sorted$INDICATION_NAME_ENG[1:25])) + 
+      scale_x_discrete(limits = rev(indications_sorted$INDICATION_NAME_ENG)) + 
       coord_flip() +
       ggtitle("Top 25 Indications (All Drugs)") +
       xlab("Indication") + 
-      ylab("Number (thousands)") +
+      ylab("Number") +
       theme_bw() +
       theme(plot.title = element_text(lineheight=.8, face="bold"), 
             legend.position = "none") +
-      scale_y_continuous(labels = format1K)
+      scale_y_continuous(limits=  c(0, NA))
     p
   })
   
   # sample datasets of what is being graphed/used
-  output$outputReports <- renderTable({
+  output$outputReports <- renderTable(
     cv_drug_tab_indc()
-  })
+  )
   
   ################ Create Outcomes(all reactions) pie chart in Reaction tab ################## 
   output$outcomeplot <- renderGvis({
