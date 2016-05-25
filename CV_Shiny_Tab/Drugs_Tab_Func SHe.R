@@ -86,7 +86,7 @@ drugs_tab <- function(current_generic, current_brand,current_rxn, date_ini, date
                             filter(is.na(PT_NAME_ENG) == FALSE) %>%
                           left_join(cv_report_drug_indication_drg, by="REPORT_ID") %>% 
                             filter(is.na(INDICATION_NAME_ENG) == FALSE) %>%
-                          as.data.frame(n=-1)
+                          as.data.table(n=-1)
   #drugs_tab_indication <- tbl_df(drugs_tab_indication)
   return(drugs_tab_indication)
 }
@@ -163,7 +163,7 @@ drugs_tab2 <- function(current_generic, current_brand,current_rxn, date_ini, dat
                         filter(as.character(DATINTRECEIVED_CLEAN) != "NA")  %>%
                       left_join(cv_reactions_drg2, by="REPORT_ID") %>%
                         filter(is.na(PT_NAME_ENG) == FALSE)  %>%
-                      as.data.frame(n=-1)
+                      as.data.table(n=-1)
   #drugs_tab_topdrg <- tbl_df(drugs_tab_topdrg)
   return(drugs_tab_topdrg)
 }
