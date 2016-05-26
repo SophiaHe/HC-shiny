@@ -2,7 +2,7 @@
 #              Report_Drug (REPORT_ID, DRUGNAME)
 
 
-patients_tab <- function( current_brand, date_ini, date_end) { 
+patients_tab <- function( current_brand, current_rxn,date_ini, date_end) { 
   # connect to CV database
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   
@@ -11,26 +11,33 @@ patients_tab <- function( current_brand, date_ini, date_end) {
   
   # Import tables with particular search items with method to deal with unspecified search term
   cv_reports_sorted_pt <- cv_reports %>%
-    select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG, AGE_GROUP_CLEAN) %>%
-    filter(DATINTRECEIVED_CLEAN >= date_ini) %>%
-    filter(DATINTRECEIVED_CLEAN <= date_end)
+                          select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG, AGE_GROUP_CLEAN) %>%
+                          filter(DATINTRECEIVED_CLEAN >= date_ini) %>%
+                          filter(DATINTRECEIVED_CLEAN <= date_end)
   
   
   cv_report_drug_pt <- if(is.na(current_brand) == FALSE){
-    cv_report_drug %>%
-      select(REPORT_ID, DRUGNAME) %>%
-      filter(DRUGNAME == current_brand)
-  } else {
-    cv_report_drug %>%
-      select(REPORT_ID, DRUGNAME)
-  }
+                          cv_report_drug %>%
+                            select(REPORT_ID, DRUGNAME) %>%
+                            filter(DRUGNAME == current_brand)
+                        } else {
+                          cv_report_drug %>%
+                            select(REPORT_ID, DRUGNAME)
+                        }
   # cv_report_drug_pt <- cv_report_drug_pt[order(cv_report_drug_pt$DRUG_PRODUCT_ID),]  
   
-  
-  patients_tab_master <- cv_reports_sorted_pt %>%
-    inner_join(cv_report_drug_pt) %>%
-    as.data.table(n=-1)
-  
-  
+  cv_reactions_pt <-if(is.na(current_rxn) == FALSE){
+                      cv_reactions %>%
+                        select(REPORT_ID, PT_NAME_ENG) %>%
+                        filter(PT_NAME_ENG == current_rxn)
+                    } else {
+                      cv_reactions %>%
+                        select(REPORT_ID, PT_NAME_ENG)
+                    }
+  patients_tab_master <-cv_reports_sorted_pt%>%
+                          semi_join(cv_report_drug_pt) %>%
+                          semi_join(cv_reactions_pt) %>%
+                          as.data.table(n=-1)
+
   return(patients_tab_master) 
 }
