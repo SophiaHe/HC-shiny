@@ -15,3 +15,11 @@ To-do 160526:
 2. Change all reactive_function to only include current_brand & date range
 3. Change current_search table to include only Brand Name & Date Range
 4. In Drugs tab,  2 bar charts are presented: Top_25_Indications associated with searched durgname + Top_25_(most reported)Ingredients associated with  searched drugname
+
+Note 160526:
+- Tables needed with DrugTabOnly Reports_Tab: CV_Reports (REPORT_ID, DATINTRECEIVED_CLEAN, SERIOUSNESS_ENG, REPORTER_TYPE_ENG, DEATH, DISABILITY, CONGENITAL_ANOMALY,LIFE_THREATENING, HOSP_REQUIRED, OTHER_MEDICALLY_IMP_COND)
+                                 CV_Report_Drug (REPORT_ID, DRUGNAME)
+- Tables needed with DrugTabOnly Patients_Tab:  CV_Reports (REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG, AGE_GROUP_CLEAN)
+                                                CV_Report_Drug (REPORT_ID, DRUGNAME)
+- Tables needed with DrugTabOnly Drugs_Tab:
+
