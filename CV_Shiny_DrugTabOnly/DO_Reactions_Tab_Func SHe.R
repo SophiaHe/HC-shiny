@@ -2,15 +2,16 @@
 #              CV_Report_Drug (REPORT_ID, DRUGNAME)
 
 
-reactions_tab <- function(current_brand,current_rxn,date_ini, date_end) { 
+reactions_tab <- function(current_brand,current_rxn,current_date_range) { 
   # connect to CV database
-  hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+  #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   
   # Import tables with particular search items with method to deal with unspecified search term
   cv_reports_sorted_rxn <- cv_reports %>%
                             select(REPORT_ID, DATINTRECEIVED_CLEAN, OUTCOME_ENG) %>%
-                            filter(DATINTRECEIVED_CLEAN >= date_ini) %>%
-                            filter(DATINTRECEIVED_CLEAN <= date_end)
+                            filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
+                            #filter(DATINTRECEIVED_CLEAN >= date_ini) %>%
+                            #filter(DATINTRECEIVED_CLEAN <= date_end)
   
   cv_report_drug_rxn <- if(is.na(current_brand) == FALSE){
                           cv_report_drug %>%
@@ -35,7 +36,7 @@ reactions_tab <- function(current_brand,current_rxn,date_ini, date_end) {
                           semi_join(cv_report_drug_rxn) %>%
                           semi_join(cv_reactions_rxn) %>%
                           select(REPORT_ID, OUTCOME_ENG) %>%
-                          as.data.table(n=-1)
+                          collect()
   
   return(reactions_tab_master)
 }
