@@ -2,25 +2,28 @@
 #                          OTHER_MEDICALLY_IMP_COND)
 #              Report_Drug (REPORT_ID, DRUGNAME)
 
-#current_brand <- "REMICADE"
-#current_rxn <- "DRUG INEFFECTIVE"
+current_brand <- "REMICADE"
+current_rxn <- NA
+current_date_range <- c(ymd("19650101", ymd("20160527")))
 #date_ini <- ymd("19650601")
 #date_end <- ymd("20160526")
 
-reports_tab <- function(current_brand,current_rxn,date_ini, date_end) { 
+reports_tab <- function(current_brand,current_rxn,current_date_range) { 
   # connect to CV database
-  hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
-  escape.POSIXt <- dplyr:::escape.Date
+  #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+  #escape.POSIXt <- dplyr:::escape.Date
   #cv_reports <- tbl(hcopen, "cv_reports") 
   #cv_report_drug <- tbl(hcopen,"cv_report_drug")
   #cv_reactions <- tbl(hcopen,"cv_reactions") 
   
+  ptm <- proc.time()
   cv_reports_sorted_rp <- cv_reports %>%
                           select(REPORT_ID, SERIOUSNESS_ENG, REPORTER_TYPE_ENG, DEATH, DISABILITY, CONGENITAL_ANOMALY,LIFE_THREATENING, HOSP_REQUIRED, 
                                  OTHER_MEDICALLY_IMP_COND, DATINTRECEIVED_CLEAN) %>%
-                          filter(DATINTRECEIVED_CLEAN >= date_ini) %>%
-                          filter(DATINTRECEIVED_CLEAN <= date_end)
-  
+                          filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
+                          #filter(DATINTRECEIVED_CLEAN >= date_ini) %>%
+                          #filter(DATINTRECEIVED_CLEAN <= date_end)
+  proc.time() - ptm
   cv_report_drug_rp <- if(is.na(current_brand) == FALSE){
                         cv_report_drug %>%
                         select(REPORT_ID, DRUGNAME) %>%
@@ -37,13 +40,13 @@ reports_tab <- function(current_brand,current_rxn,date_ini, date_end) {
                         cv_reactions %>%
                           select(REPORT_ID, PT_NAME_ENG)
                       }
-  #ptm <- proc.time()
+ 
   reports_tab_master <-  cv_reports_sorted_rp%>%
-                          semi_join(cv_report_drug_rp) %>%
+                          inner_join(cv_report_drug_rp) %>%
                           semi_join(cv_reactions_rp) %>%
-                          as.data.table(n=-1) 
+                          collect()
   
-  #proc.time() - ptm
+ 
   
   return(reports_tab_master) 
 }
