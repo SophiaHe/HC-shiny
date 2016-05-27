@@ -2,7 +2,7 @@
 #                        cv_report_drug (REPORT_ID,DRUGNAME)
 #                        cv_report_drug_indication (REPORT_ID, INDICATION_NAME_ENG)
 
-drugs_tab_indt <- function(current_brand, current_rxn,date_ini, date_end) { 
+drugs_tab_indt <- function(current_brand, current_rxn,current_date_range) { 
   # connect to CV database
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
 
@@ -10,8 +10,9 @@ drugs_tab_indt <- function(current_brand, current_rxn,date_ini, date_end) {
   # Import tables with particular search items
   cv_reports_sorted_drg <- cv_reports %>%
                             select(REPORT_ID, DATINTRECEIVED_CLEAN) %>%
-                            filter(DATINTRECEIVED_CLEAN >= date_ini) %>%
-                            filter(DATINTRECEIVED_CLEAN <= date_end)
+                            filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
+                            #filter(DATINTRECEIVED_CLEAN >= date_ini) %>%
+                            #filter(DATINTRECEIVED_CLEAN <= date_end)
   
   cv_report_drug_drg <- if(is.na(current_brand) == FALSE){
                           cv_report_drug %>%
@@ -44,7 +45,7 @@ drugs_tab_indt <- function(current_brand, current_rxn,date_ini, date_end) {
                             semi_join(cv_report_drug_drg, by="REPORT_ID") %>% 
                             semi_join(cv_reactions_drg, by="REPORT_ID") %>%
                             inner_join(cv_report_drug_indication_drg) %>%
-                            as.data.table(n=-1)
+                            collect()
   
   return(drugs_tab_indication)
 }
@@ -60,13 +61,13 @@ drugs_tab_indt <- function(current_brand, current_rxn,date_ini, date_end) {
 #                   cv_report_drug (REPORT_ID,DRUGNAME)
 #                   cv_report_drug_indication (REPORT_ID, INDICATION_NAME_ENG)
 
-drugs_tab_topdrg <- function(current_brand,current_rxn,date_ini, date_end) { 
+drugs_tab_topdrg <- function(current_brand,current_rxn,current_date_range) { 
   # connect to CV database
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   
   setwd("~/CV_Shiny_DrugTabOnly")
   source("DO_Drugs_Tab_Func SHe.R")
-  df <- drugs_tab_indt(current_brand = current_brand, current_rxn = current_rxn, date_ini=date_ini, date_end=date_end)
+  df <- drugs_tab_indt(current_brand = current_brand, current_rxn = current_rxn, current_date_range=current_date_range)
  
   indications <-  dplyr::summarise(group_by(df, INDICATION_NAME_ENG),count=n_distinct(REPORT_ID))
   top_indications<- indications %>% arrange(desc(count)) %>% top_n(n=1) %>% select(INDICATION_NAME_ENG)
@@ -79,8 +80,9 @@ drugs_tab_topdrg <- function(current_brand,current_rxn,date_ini, date_end) {
                                     filter(INDICATION_NAME_ENG == top_indications_final)
   cv_reports_sorted_drg <- cv_reports %>%
                             select(REPORT_ID, DATINTRECEIVED_CLEAN) %>%
-                            filter(DATINTRECEIVED_CLEAN >= date_ini) %>%
-                            filter(DATINTRECEIVED_CLEAN <= date_end)
+                            filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
+                            #filter(DATINTRECEIVED_CLEAN >= date_ini) %>%
+                            #filter(DATINTRECEIVED_CLEAN <= date_end)
   
   cv_report_drug_drg <- if(is.na(current_brand) == FALSE){
                           cv_report_drug %>%
@@ -95,7 +97,7 @@ drugs_tab_topdrg <- function(current_brand,current_rxn,date_ini, date_end) {
                       inner_join(cv_report_drug_drg)%>%
                       semi_join(cv_report_drug_indication_drg) %>%
                       select(REPORT_ID, DRUGNAME) %>%
-                      as.data.table(n=-1)
+                      collect()
 
   return(drugs_tab_topdrg)
 }
