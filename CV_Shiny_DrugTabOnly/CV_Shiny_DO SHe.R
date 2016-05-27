@@ -51,14 +51,14 @@ adrplot <- function(adrplot_test, plottitle){
   total_reports <- sum(nreports$n)
   
   
-  plottitle <- paste(plottitle, " (", total_reports, " reports)") 
+  plottitle1 <- paste(plottitle, " (", total_reports, " reports)") 
   
   
   plot <- nreports %>%
     ggplot(aes(x = plot_date, y = n)) +
     geom_line(stat = "identity", size = 0.1) +
     stat_smooth(method = "loess", size = 0.1) +
-    ggtitle(plottitle) + 
+    ggtitle(plottitle1) + 
     xlab("Month") + 
     ylab("Number of Reports") +
     theme_bw() +
@@ -69,14 +69,14 @@ adrplot <- function(adrplot_test, plottitle){
   
 }
 
-format1K <- function(x){
-  x/1000
-}
+# format1K <- function(x){
+#   x/1000
+# }
 
 
 ############ UI for REPORT Tab shiny ################
 ui <- dashboardPage(
-  dashboardHeader(title = "Shiny FAERS (v0.04)"),
+  dashboardHeader(title = "CV Shiny"),
   dashboardSidebar(
     sidebarMenu(
       menuItem("Reports", tabName = "reportdata", icon = icon("hospital-o")),
@@ -97,21 +97,21 @@ ui <- dashboardPage(
                    options = list(create = TRUE,
                                   placeholder = 'Please select an option below',
                                   onInitialize = I('function() { this.setValue(""); }'))),
-    #dateRangeInput("searchDateRange", 
-    #               "Date Range", 
-    #               start = "1973-01-01", 
-    #               end = Sys.Date(),
-    #               startview = "year",
-    #               format = "yyyy-mm-dd"),
-    dateInput("search_date_ini",
-              label = 'Date initial input: yyyy-mm-dd',
-              value = "1965-01-01"
-    ),
-    
-    dateInput("search_date_end",
-              label = 'Date end input: yyyy-mm-dd',
-              value = Sys.Date()
-    ),
+    dateRangeInput("searchDateRange",
+                  "Date Range",
+                  start = "1965-01-01",
+                  end = Sys.Date(),
+                  startview = "year",
+                  format = "yyyy-mm-dd"),
+    # dateInput("search_date_ini",
+    #           label = 'Date initial input: yyyy-mm-dd',
+    #           value = "1965-01-01"
+    # ),
+    # 
+    # dateInput("search_date_end",
+    #           label = 'Date end input: yyyy-mm-dd',
+    #           value = Sys.Date()
+    # ),
     
     actionButton("searchButton", "Search"),
     tags$br(),
@@ -195,174 +195,222 @@ options(shiny.trace = TRUE, shiny.reactlog=TRUE)
 
 ############### Server Functions ###################
 server <- function(input, output) {
-  # Data frame generate reactive function to be used to assign: data <- cv_reports_tab() 
+  # Build a overall reactive function that return a list of data tables which can be used to import data (data <- cv_query())
+  # cv_query <- reactive({
+  #   input$searchButton
+  #   #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+  #   current_brand <- isolate(ifelse(input$search_brand == "",
+  #                                   NA,
+  #                                   input$search_brand)) 
+  #   current_rxn <- isolate(ifelse(input$search_rxn == "",
+  #                                 NA,
+  #                                 input$search_rxn)) 
+  #   current_date_range <- isolate(input$searchDateRange)
+  #   escape.POSIXt <- dplyr:::escape.Date
+  #   
+  #   setwd("~/CV_Shiny_DrugTabOnly")
+  #   source("DO_Reports_Tab_Func SHe.R")
+  #   reports_tab_df <- reports_tab(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
+  #   
+  #   source("DO_Patients_Tab_Func SHe.R")
+  #   patients_tab_df <- patients_tab(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
+  #   
+  #   source("DO_Drugs_Tab_Func SHe.R")
+  #   drugs_tab_topdrg_df <- drugs_tab_topdrg(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
+  #   drugs_tab_indt_df <- drugs_tab_indt(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
+  #   
+  #   source("DO_Reactions_Tab_Func SHe.R")
+  #   reactions_tab_df <- reactions_tab(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
+  #   
+  #   search_tab_df <- data.frame(names = c("Brand Name:", 
+  #                                         "Adverse Reaction Term:",
+  #                                         "Date Range:"),
+  #                               terms = c(current_brand,current_rxn,paste(current_date_range[1]," to ", current_date_range[2])),
+  #                               stringsAsFactors=FALSE)
+  #   #paste(date_ini, " to ",date_end)
+  #   search_tab_df$terms[is.na(search_tab_df$terms) == TRUE] <- "Not Specified"
+  #   
+  #   return(list(reports_tab_df = reports_tab_df,
+  #               patients_tab_df =patients_tab_df,
+  #               drugs_tab_topdrg_df = drugs_tab_topdrg_df,
+  #               drugs_tab_indt_df = drugs_tab_indt_df,
+  #               reactions_tab_df = reactions_tab_df,
+  #               data_search = search_tab_df))
+  # })
   
+  #########################################################################################################################################  
+  # Data frame generate reactive function to be used to assign: data <- cv_reports_tab()
   cv_reports_tab <- reactive({
     input$searchButton
     #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_brand <- isolate(ifelse(input$search_brand == "",
                                     NA,
-                                    input$search_brand)) 
+                                    input$search_brand))
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
-                                  input$search_rxn)) 
-    date_ini <- isolate(as.POSIXct(input$search_date_ini))
-    date_end <- isolate(as.POSIXct(input$search_date_end))
-
+                                  input$search_rxn))
+    current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
-    
+
     setwd("~/CV_Shiny_DrugTabOnly")
     source("DO_Reports_Tab_Func SHe.R")
-    reports_tab_df <- reports_tab(current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
-    
+    reports_tab_df <- reports_tab(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
+
     return(reports_tab_df)
   })
-  
+
   # sample datasets of what is being graphed/used
   #output$outputReports <- renderTable({
   #  cv_reports_tab()[1:4,c("ACTIVE_INGREDIENT_NAME","DRUGNAME","DATINTRECEIVED_CLEAN","PT_NAME_ENG")]
   #})
-  
-  hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+
+  #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   cv_search_tab <- reactive({
     input$searchButton
     #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_brand <- isolate(ifelse(input$search_brand == "",
                                     NA,
-                                    input$search_brand)) 
+                                    input$search_brand))
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
-                                  input$search_rxn)) 
-    #current_date_range <- isolate(input$searchDateRange)
-    date_ini <- isolate(input$search_date_ini)
-    date_end <- isolate(input$search_date_end)
-    
+                                  input$search_rxn))
+    current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
-    
-    search_tab_df <- data.frame(names = c("Brand Name:", 
+
+    search_tab_df <- data.frame(names = c("Brand Name:",
                                           "Adverse Reaction Term:",
                                           "Date Range:"),
-                                terms = c(current_brand,current_rxn,paste(date_ini, " to ",date_end)),
+                                terms = c(current_brand,current_rxn,paste(current_date_range[1]," to ", current_date_range[2])),
                                 stringsAsFactors=FALSE)
+    #paste(date_ini, " to ",date_end)
     search_tab_df$terms[is.na(search_tab_df$terms) == TRUE] <- "Not Specified"
     return(search_tab_df)
   })
-  
-  hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+
+  #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   cv_patients_tab <- reactive({
     input$searchButton
     #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_brand <- isolate(ifelse(input$search_brand == "",
                                     NA,
-                                    input$search_brand)) 
+                                    input$search_brand))
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
-                                  input$search_rxn)) 
-    date_ini <- isolate(as.POSIXct(input$search_date_ini))
-    date_end <- isolate(as.POSIXct(input$search_date_end))
-
+                                  input$search_rxn))
+    current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
-    
+
     setwd("~/CV_Shiny_DrugTabOnly")
     source("DO_Patients_Tab_Func SHe.R")
-    
-    patients_tab_df <- patients_tab(current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
-    
+
+    patients_tab_df <- patients_tab(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
+
     return(patients_tab_df)
   })
-  
-  hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+
+  #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   cv_drug_tab_topdrg <- reactive({
     input$searchButton
     #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_brand <- isolate(ifelse(input$search_brand == "",
                                     NA,
-                                    input$search_brand)) 
+                                    input$search_brand))
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
-                                  input$search_rxn)) 
-    date_ini <- isolate(as.POSIXct(input$search_date_ini))
-    date_end <- isolate(as.POSIXct(input$search_date_end))
-    
+                                  input$search_rxn))
+    current_date_range <- isolate(input$searchDateRange)
+    #date_ini <- isolate(as.POSIXct(input$search_date_ini))
+    #date_end <- isolate(as.POSIXct(input$search_date_end))
+
     escape.POSIXt <- dplyr:::escape.Date
-    
+
     setwd("~/CV_Shiny_DrugTabOnly")
     source("DO_Drugs_Tab_Func SHe.R")
-    
-    drugs_tab_topdrg_df <- drugs_tab_topdrg(current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
-    
-    
-    #drugs <- ddply(drugs_tab_df,"DRUGNAME", count_func) 
-    #drugs_sorted <- drugs[order(desc(drugs$n)),] 
+
+    drugs_tab_topdrg_df <- drugs_tab_topdrg(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
+
+
+    #drugs <- ddply(drugs_tab_df,"DRUGNAME", count_func)
+    #drugs_sorted <- drugs[order(desc(drugs$n)),]
     #drugs_sorted <- drugs %>% arrange(desc(n)) %>% top_n(25)
-    
+
     return(drugs_tab_topdrg_df)
   })
-  
-  hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+
+  #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   cv_drug_tab_indc <- reactive({
     input$searchButton
     #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_brand <- isolate(ifelse(input$search_brand == "",
                                     NA,
-                                    input$search_brand)) 
+                                    input$search_brand))
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
-                                  input$search_rxn)) 
-    date_ini <- isolate(as.POSIXct(input$search_date_ini))
-    date_end <- isolate(as.POSIXct(input$search_date_end))
-    
+                                  input$search_rxn))
+    current_date_range <- isolate(input$searchDateRange)
+    #date_ini <- isolate(as.POSIXct(input$search_date_ini))
+    #date_end <- isolate(as.POSIXct(input$search_date_end))
+
     escape.POSIXt <- dplyr:::escape.Date
-    
+
     setwd("~/CV_Shiny_DrugTabOnly")
     source("DO_Drugs_Tab_Func SHe.R")
-    
-    drugs_tab_indt_df <- drugs_tab_indt(current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
-    
+
+    drugs_tab_indt_df <- drugs_tab_indt(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
+
     return(drugs_tab_indt_df)
   })
-  
-  hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+
+  #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   cv_reactions_tab <- reactive({
     input$searchButton
     #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_brand <- isolate(ifelse(input$search_brand == "",
                                     NA,
-                                    input$search_brand)) 
+                                    input$search_brand))
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
-                                  input$search_rxn)) 
-    date_ini <- isolate(as.POSIXct(input$search_date_ini))
-    date_end <- isolate(as.POSIXct(input$search_date_end))
-    
+                                  input$search_rxn))
+    current_date_range <- isolate(input$searchDateRange)
+    #date_ini <- isolate(as.POSIXct(input$search_date_ini))
+    #date_end <- isolate(as.POSIXct(input$search_date_end))
+
     escape.POSIXt <- dplyr:::escape.Date
-    
+
     setwd("~/CV_Shiny_DrugTabOnly")
     source("DO_Reactions_Tab_Func SHe.R")
-    
-    reactions_tab_df <- reactions_tab(current_brand=current_brand,current_rxn=current_rxn,date_ini=date_ini,date_end=date_end)
-    
+
+    reactions_tab_df <- reactions_tab(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
+
     return(reactions_tab_df)
   })
+#########################################################################################################################################
+  
+  
+  
   
   
   ############## Construct Current_Query_Table for generic name, brand name, adverse reaction term & date range searched ############
   output$current_search <- renderTable({
-    data_search <- cv_search_tab()
+     data<- cv_search_tab()
   }, include.rownames = FALSE, include.colnames = FALSE)
   
   ############### Create time plot #####################
   output$timeplot <- renderPlotly({
     
     data <- cv_reports_tab()
-    drug_selected <- data$DRUGNAME[1] 
+   
+    #drug_selected <- data$DRUGNAME[1] 
     
+    data1 <- cv_search_tab()
+    drug_selected <- data1$terms[1]
+    #drug_selected <- "abc"
     
     # specify the title of time plot based on reactive choice
-    title <- ifelse(!is.na(drug_selected), drug_selected, "All Drugs")
+    title <- ifelse(drug_selected == "Not Specified", "All Drugs",drug_selected)
     plottitle <- paste("Drug Adverse Event Reports for", title)
     p <- adrplot(adrplot_test = data, plottitle = plottitle)
-    print(p)
+    #print(p)
     ggplotly(p)
   })
   
@@ -375,7 +423,7 @@ server <- function(input, output) {
     reporter_df <- data %>% select(REPORT_ID, REPORTER_TYPE_ENG)
     
     # Use ddply & count_func to count number of unique report for each REPORTER_TYPE_ENG
-    reporter_results<-dplyr::summarise(group_by(data, REPORTER_TYPE_ENG),count=n_distinct(REPORT_ID))
+    reporter_results<-dplyr::summarise(group_by(reporter_df, REPORTER_TYPE_ENG),count=n_distinct(REPORT_ID))
     reporter_results$REPORTER_TYPE_ENG[reporter_results$REPORTER_TYPE_ENG == ""] <- "Not Specified"
     
     gvisPieChart(reporter_results, 
@@ -393,10 +441,10 @@ server <- function(input, output) {
   output$seriousplot <- renderGvis({
     data <- cv_reports_tab()
     
-    serious_df <- data %>%
+    serious_df <-  data%>%
       select(REPORT_ID,SERIOUSNESS_ENG)
     
-    serious_results <- dplyr::summarise(group_by(data, SERIOUSNESS_ENG),count=n_distinct(REPORT_ID))
+    serious_results <- dplyr::summarise(group_by(serious_df, SERIOUSNESS_ENG),count=n_distinct(REPORT_ID))
     serious_results$SERIOUSNESS_ENG[serious_results$SERIOUSNESS_ENG == ""] <- "Not Specified"
     
     gvisPieChart(serious_results, 
@@ -412,16 +460,14 @@ server <- function(input, output) {
   ################ Create Serious Reason Reports chart ################## 
   output$seriousreasonsplot <- renderGvis({
     data <- cv_reports_tab()
-    # test
-    # data <- reports_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
-    
+   
     # calculate total number of serious reports
     total_serious <- dplyr::summarise(group_by(data, SERIOUSNESS_ENG),count=n_distinct(REPORT_ID))
     total_serious_final <- total_serious$count[total_serious$SERIOUSNESS_ENG == "Yes"]
     
     # create NotSpecified Column to indicate serious report with no reasons specified
-    serious_reason <-data%>%
-      filter(SERIOUSNESS_ENG == "Yes" & is.na(DISABILITY)==TRUE & is.na(CONGENITAL_ANOMALY)==TRUE & is.na(LIFE_THREATENING)==TRUE & 
+    serious_reason <-data %>%
+      filter(SERIOUSNESS_ENG == "Yes" & is.na(DEATH) == TRUE & is.na(DISABILITY)==TRUE & is.na(CONGENITAL_ANOMALY)==TRUE & is.na(LIFE_THREATENING)==TRUE & 
                is.na(HOSP_REQUIRED)==TRUE & is.na(OTHER_MEDICALLY_IMP_COND) == TRUE) %>%
       mutate(NotSpecified = 1)%>%
       select(REPORT_ID, NotSpecified) 
@@ -436,110 +482,117 @@ server <- function(input, output) {
     serious_reason_df$LIFE_THREATENING[is.na(serious_reason_df$LIFE_THREATENING) == TRUE] <- "NA"
     serious_reason_df$OTHER_MEDICALLY_IMP_COND[is.na(serious_reason_df$OTHER_MEDICALLY_IMP_COND) == TRUE] <- "NA"
     
-    serious_reason_df$NotSpecified <- as.factor(serious_reason_df$NotSpecified)
-    serious_reason_df$CONGENITAL_ANOMALY <- as.factor(serious_reason_df$CONGENITAL_ANOMALY)
-    serious_reason_df$HOSP_REQUIRED <- as.factor(serious_reason_df$HOSP_REQUIRED)
-    serious_reason_df$DEATH <- as.factor(serious_reason_df$DEATH)
-    serious_reason_df$DISABILITY <- as.factor(serious_reason_df$DISABILITY)
-    serious_reason_df$LIFE_THREATENING <- as.factor(serious_reason_df$LIFE_THREATENING)
-    serious_reason_df$OTHER_MEDICALLY_IMP_COND <- as.factor(serious_reason_df$OTHER_MEDICALLY_IMP_COND)
+    # serious_reason_df$NotSpecified <- as.factor(serious_reason_df$NotSpecified)
+    # serious_reason_df$CONGENITAL_ANOMALY <- as.factor(serious_reason_df$CONGENITAL_ANOMALY)
+    # serious_reason_df$HOSP_REQUIRED <- as.factor(serious_reason_df$HOSP_REQUIRED)
+    # serious_reason_df$DEATH <- as.factor(serious_reason_df$DEATH)
+    # serious_reason_df$DISABILITY <- as.factor(serious_reason_df$DISABILITY)
+    # serious_reason_df$LIFE_THREATENING <- as.factor(serious_reason_df$LIFE_THREATENING)
+    # serious_reason_df$OTHER_MEDICALLY_IMP_COND <- as.factor(serious_reason_df$OTHER_MEDICALLY_IMP_COND)
     
     # NotSpecified
-    NotSpecified_results <- ddply(serious_reason_df,c("SERIOUSNESS_ENG","NotSpecified"),count_func)
-    
+    #NotSpecified_results <- ddply(serious_reason_df,c("SERIOUSNESS_ENG","NotSpecified"),count_func)
+    NotSpecified_results <- dplyr::summarise(group_by(serious_reason_df, SERIOUSNESS_ENG,NotSpecified),count=n_distinct(REPORT_ID))
+      
     if(any(NotSpecified_results$NotSpecified == 1) ==TRUE){
       NotSpecified_results_final <-NotSpecified_results %>% 
         filter(NotSpecified_results$SERIOUSNESS_ENG == "Yes" & NotSpecified_results$NotSpecified == 1)%>%
         mutate(Reasons = "NotSpecified")%>%
-        select(Reasons,n)
+        select(Reasons,count)
     } else {
       Reasons <- I("NotSpecified")
-      n <- c(0)
-      NotSpecified_results_final <- data.frame(Reasons,n)
+      count <- c(0)
+      NotSpecified_results_final <- data.frame(Reasons,count)
     }
     
     # Congenital               
-    congenital_results <- ddply(serious_reason_df,c("SERIOUSNESS_ENG","CONGENITAL_ANOMALY"),count_func)
+    #congenital_results <- ddply(serious_reason_df,c("SERIOUSNESS_ENG","CONGENITAL_ANOMALY"),count_func)
+    congenital_results <- dplyr::summarise(group_by(serious_reason_df, SERIOUSNESS_ENG,CONGENITAL_ANOMALY),count=n_distinct(REPORT_ID))
     
     if(any(congenital_results$CONGENITAL_ANOMALY == 1) ==TRUE){
       congenital_results_final <-congenital_results %>% 
         filter(congenital_results$SERIOUSNESS_ENG == "Yes" & congenital_results$CONGENITAL_ANOMALY == 1)%>%
         mutate(Reasons = "Congenital")%>%
-        select(Reasons,n)
+        select(Reasons,count)
     } else {
       Reasons <- I("Congenital")
-      n <- c(0)
-      congenital_results_final <- data.frame(Reasons,n)
+      count <- c(0)
+      congenital_results_final <- data.frame(Reasons,count)
     }
     
     # Death
-    death_results <- ddply(serious_reason_df, c("SERIOUSNESS_ENG", "DEATH"),count_func)
-    
+    #death_results <- ddply(serious_reason_df, c("SERIOUSNESS_ENG", "DEATH"),count_func)
+    death_results <- dplyr::summarise(group_by(serious_reason_df, SERIOUSNESS_ENG,DEATH),count=n_distinct(REPORT_ID))
+      
     if(any(death_results$DEATH == 1) ==TRUE){
       death_results_final <-death_results %>% 
         filter(death_results$SERIOUSNESS_ENG == "Yes" & death_results$DEATH == 1)%>%
         mutate(Reasons = "DEATH")%>%
-        select(Reasons,n)
+        select(Reasons,count)
     } else {
       Reasons <- I("DEATH")
-      n <- c(0)
-      death_results_final <- data.frame(Reasons,n)
+      count <- c(0)
+      death_results_final <- data.frame(Reasons,count)
     }
     
     # Disability
-    disabling_results <-  ddply(serious_reason_df, c("SERIOUSNESS_ENG", "DISABILITY"),count_func)
+    #disabling_results <-  ddply(serious_reason_df, c("SERIOUSNESS_ENG", "DISABILITY"),count_func)
+    disabling_results <- dplyr::summarise(group_by(serious_reason_df, SERIOUSNESS_ENG,DISABILITY),count=n_distinct(REPORT_ID))
     
     if(any(disabling_results$DISABILITY == 1) ==TRUE){
       disabling_results_final <-disabling_results %>% 
         filter(disabling_results$SERIOUSNESS_ENG == "Yes" & disabling_results$DISABILITY == 1)%>%
         mutate(Reasons = "DISABILITY")%>%
-        select(Reasons,n)
+        select(Reasons,count)
     } else {
       Reasons <- I("DISABILITY")
-      n <- c(0)
-      disabling_results_final <- data.frame(Reasons,n)
+      count <- c(0)
+      disabling_results_final <- data.frame(Reasons,count)
     }
     
     # Hospitalization
-    hospital_results <- ddply(serious_reason_df,c("SERIOUSNESS_ENG","HOSP_REQUIRED"),count_func)
+    #hospital_results <- ddply(serious_reason_df,c("SERIOUSNESS_ENG","HOSP_REQUIRED"),count_func)
+    hospital_results <- dplyr::summarise(group_by(serious_reason_df, SERIOUSNESS_ENG,HOSP_REQUIRED),count=n_distinct(REPORT_ID))
     
     if(any(hospital_results$HOSP_REQUIRED == 1) ==TRUE ) {
       hospital_results_final <- hospital_results %>% 
         filter(hospital_results$SERIOUSNESS_ENG == "Yes" & hospital_results$HOSP_REQUIRED == 1) %>%
         mutate(Reasons = "Hospitalization") %>%
-        select(Reasons,n)
+        select(Reasons,count)
     } else {
       Reasons <- I("Hospitalization")
-      n <- c(0)
-      hospital_results_final <- data.frame(Reasons,n)
+      count <- c(0)
+      hospital_results_final <- data.frame(Reasons,count)
     }
     
     # Lifethreatening                  
-    lifethreaten_results <- ddply(serious_reason_df, c("SERIOUSNESS_ENG", "LIFE_THREATENING"),count_func)
+    #lifethreaten_results <- ddply(serious_reason_df, c("SERIOUSNESS_ENG", "LIFE_THREATENING"),count_func)
+    lifethreaten_results <- dplyr::summarise(group_by(serious_reason_df, SERIOUSNESS_ENG,LIFE_THREATENING),count=n_distinct(REPORT_ID))
     
     if(any(lifethreaten_results$LIFE_THREATENING == 1) ==TRUE){
       lifethreaten_results_final <- disabling_results %>% 
         filter(lifethreaten_results$SERIOUSNESS_ENG == "Yes" & lifethreaten_results$LIFE_THREATENING == 1)%>%
         mutate(Reasons = "LIFE_THREATENING")%>%
-        select(Reasons,n)
+        select(Reasons,count)
     } else {
       Reasons <- I("LIFE_THREATENING")
-      n <- c(0)
-      lifethreaten_results_final <- data.frame(Reasons,n)
+      count <- c(0)
+      lifethreaten_results_final <- data.frame(Reasons,count)
     }
     
     # Other
-    serother_results <- ddply(serious_reason_df, c("SERIOUSNESS_ENG", "OTHER_MEDICALLY_IMP_COND"),count_func)
+    #serother_results <- ddply(serious_reason_df, c("SERIOUSNESS_ENG", "OTHER_MEDICALLY_IMP_COND"),count_func)
+    serother_results <- dplyr::summarise(group_by(serious_reason_df, SERIOUSNESS_ENG,OTHER_MEDICALLY_IMP_COND),count=n_distinct(REPORT_ID))
     
     if(any(serother_results$OTHER_MEDICALLY_IMP_COND == 1) ==TRUE){
       serother_results_final <-disabling_results %>% 
         filter(serother_results$SERIOUSNESS_ENG == "Yes" & serother_results$OTHER_MEDICALLY_IMP_COND == 1)%>%
         mutate(Reasons = "OTHER_MEDICALLY_IMP_COND")%>%
-        select(Reasons,n)
+        select(Reasons,count)
     } else {
       Reasons <- I("OTHER_MEDICALLY_IMP_COND")
-      n <- c(0)
-      serother_results_final <- data.frame(Reasons,n)
+      count <- c(0)
+      serother_results_final <- data.frame(Reasons,count)
     }
     
     # Combine all SeriousReasons Frequency tables together
@@ -634,7 +687,7 @@ server <- function(input, output) {
     data <- cv_drug_tab_topdrg()
     
     drugs <-  dplyr::summarise(group_by(data, DRUGNAME),count=n_distinct(REPORT_ID))
-    drugs_sorted<- drugs %>% arrange(desc(count)) %>% top_n(n=25) 
+    drugs_sorted<- drugs %>% dplyr::arrange(desc(count)) %>% top_n(n=25) 
     # the top drugs reported here might be influenced by such drug is originally most reported among all reports
     
     library(scales)
@@ -658,7 +711,7 @@ server <- function(input, output) {
     # data <-drugs_tab(current_generic="phenytoin",current_brand="DILANTIN",current_rxn=NA,date_ini=ymd("19650101"),date_end=ymd("20151231"))
     
     indications <-  dplyr::summarise(group_by(data, INDICATION_NAME_ENG),count=n_distinct(REPORT_ID))
-    indications_sorted<- indications %>% arrange(desc(count)) %>% top_n(n=25)
+    indications_sorted<- indications %>% dplyr::arrange(desc(count)) %>% top_n(n=25)
     
     library(scales)
     p <- ggplot(indications_sorted, aes(x = INDICATION_NAME_ENG, y = n, fill = INDICATION_NAME_ENG)) + 
@@ -676,9 +729,9 @@ server <- function(input, output) {
   })
   
   # sample datasets of what is being graphed/used
-  output$outputReports <- renderTable(
-    cv_drug_tab_indc()
-  )
+  #output$outputReports <- renderTable(
+  #  cv_drug_tab_indc()
+  #)
   
   ################ Create Outcomes(all reactions) pie chart in Reaction tab ################## 
   output$outcomeplot <- renderGvis({
