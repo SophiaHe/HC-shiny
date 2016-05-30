@@ -26,8 +26,8 @@ cv_report_drug_indication <- tbl(hcopen,"cv_report_drug_indication")
 
 #data frames used in DRUGS tab for top 1000 drugs with most reports submitted
 #Fetch top 1000 most-reported ingredients
-setwd("~/CV_Shiny_Tab")
-source("Dropdown_Menu_Func.R")
+setwd("~/CVShiny")
+source("DO_Dropdown_Menu_Func.R")
 
 #Fetch top 1000 most-reported brand/drug names
 topbrands <- topdrug_func(n=100)
@@ -82,8 +82,8 @@ ui <- dashboardPage(
       menuItem("Reports", tabName = "reportdata", icon = icon("hospital-o")),
       menuItem("Drugs", tabName = "drugdata", icon = icon("flask")),
       menuItem("Patients", tabName = "patientdata", icon = icon("user-md")),
-      menuItem("Reactions", tabName = "rxndata", icon = icon("heart-o"))
-      
+      menuItem("Reactions", tabName = "rxndata", icon = icon("heart-o")),
+      menuItem("About", tabName = "aboutinfo", icon = icon("info"))
     ),
     selectizeInput("search_brand", 
                    "Brand Name (US Trade Name)",
@@ -174,7 +174,13 @@ ui <- dashboardPage(
               fluidRow(
                 box(htmlOutput("outcomeplot"), title = tags$h2("Outcomes (all reactions)"))
               )
-      ) # more tabs added here!
+      ),
+      tabItem(tabName = "aboutinfo",
+              tags$p("Data provided by the Canada Vigilance Adverse Reaction Online Database (http://www.hc-sc.gc.ca/dhp-mps/medeff/databasdon/index-eng.php)"),
+              tags$h2("This is a prototyping platform to utilize open data sources (e.g. Canada Vigilance Adverse Reaction Online Database) 
+                      and provide visualizations in an interactive format. Further analysis can be conducted and added onto this platform to make 
+                      better use of the data.")
+      )
               )
     ), 
   skin = "blue"
@@ -248,7 +254,7 @@ server <- function(input, output) {
     current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
 
-    setwd("~/CV_Shiny_DrugTabOnly")
+    setwd("~/CVShiny")
     source("DO_Reports_Tab_Func SHe.R")
     reports_tab_df <- reports_tab(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
 
@@ -278,7 +284,7 @@ server <- function(input, output) {
                                           "Date Range:"),
                                 terms = c(current_brand,current_rxn,paste(current_date_range[1]," to ", current_date_range[2])),
                                 stringsAsFactors=FALSE)
-    #paste(date_ini, " to ",date_end)
+
     search_tab_df$terms[is.na(search_tab_df$terms) == TRUE] <- "Not Specified"
     return(search_tab_df)
   })
@@ -296,7 +302,7 @@ server <- function(input, output) {
     current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
 
-    setwd("~/CV_Shiny_DrugTabOnly")
+    setwd("~/CVShiny")
     source("DO_Patients_Tab_Func SHe.R")
 
     patients_tab_df <- patients_tab(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
@@ -315,20 +321,12 @@ server <- function(input, output) {
                                   NA,
                                   input$search_rxn))
     current_date_range <- isolate(input$searchDateRange)
-    #date_ini <- isolate(as.POSIXct(input$search_date_ini))
-    #date_end <- isolate(as.POSIXct(input$search_date_end))
-
     escape.POSIXt <- dplyr:::escape.Date
 
-    setwd("~/CV_Shiny_DrugTabOnly")
+    setwd("~/CVShiny")
     source("DO_Drugs_Tab_Func SHe.R")
 
     drugs_tab_topdrg_df <- drugs_tab_topdrg(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
-
-
-    #drugs <- ddply(drugs_tab_df,"DRUGNAME", count_func)
-    #drugs_sorted <- drugs[order(desc(drugs$n)),]
-    #drugs_sorted <- drugs %>% arrange(desc(n)) %>% top_n(25)
 
     return(drugs_tab_topdrg_df)
   })
@@ -344,12 +342,9 @@ server <- function(input, output) {
                                   NA,
                                   input$search_rxn))
     current_date_range <- isolate(input$searchDateRange)
-    #date_ini <- isolate(as.POSIXct(input$search_date_ini))
-    #date_end <- isolate(as.POSIXct(input$search_date_end))
-
     escape.POSIXt <- dplyr:::escape.Date
 
-    setwd("~/CV_Shiny_DrugTabOnly")
+    setwd("~/CVShiny")
     source("DO_Drugs_Tab_Func SHe.R")
 
     drugs_tab_indt_df <- drugs_tab_indt(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
@@ -368,17 +363,33 @@ server <- function(input, output) {
                                   NA,
                                   input$search_rxn))
     current_date_range <- isolate(input$searchDateRange)
-    #date_ini <- isolate(as.POSIXct(input$search_date_ini))
-    #date_end <- isolate(as.POSIXct(input$search_date_end))
-
     escape.POSIXt <- dplyr:::escape.Date
 
-    setwd("~/CV_Shiny_DrugTabOnly")
+    setwd("~/CVShiny")
     source("DO_Reactions_Tab_Func SHe.R")
 
     reactions_tab_df <- reactions_tab(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
 
     return(reactions_tab_df)
+  })
+  
+  cv_reactions_tbl <- reactive({
+    input$searchButton
+    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    current_brand <- isolate(ifelse(input$search_brand == "",
+                                    NA,
+                                    input$search_brand))
+    current_date_range <- isolate(input$searchDateRange)
+    escape.POSIXt <- dplyr:::escape.Date
+    
+    setwd("~/CVShiny")
+    source("DO_Reactions_Tab_Func SHe.R")
+    
+    drugs_rxn_df <- drugs_rxn(current_brand=current_brand,current_date_range=current_date_range)
+    drugs_rxn_result <- dplyr::summarise(group_by(drugs_rxn_df, DRUGNAME,PT_NAME_ENG),count=n_distinct(REPORT_ID))%>% 
+                        top_n(10) %>% as.data.table(n=-1)
+    
+    return(drugs_rxn_result)
   })
 #########################################################################################################################################
   
@@ -732,6 +743,10 @@ server <- function(input, output) {
                  numvar = "n", 
                  options = list(pieHole = 0.4))
   })
-  }
+  
+  output$rxnTbl <- renderDataTable(
+    data <- cv_reactions_tbl()
+  )
+}
 
 shinyApp(ui, server)
