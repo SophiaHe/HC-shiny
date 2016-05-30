@@ -23,3 +23,6 @@ Note 160526:
                                                 CV_Report_Drug (REPORT_ID, DRUGNAME)
 - Tables needed with DrugTabOnly Drugs_Tab:
 
+Note 160530:
+- For all serious_reasons columns: "1" = "Yes", "2" = "No", NA = "missing"
+
