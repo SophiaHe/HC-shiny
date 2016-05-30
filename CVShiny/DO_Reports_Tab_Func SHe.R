@@ -5,8 +5,7 @@
 #current_brand <- "REMICADE"
 #current_rxn <- NA
 #current_date_range <- c(ymd("19650101", ymd("20160527")))
-#date_ini <- ymd("19650601")
-#date_end <- ymd("20160526")
+
 
 reports_tab <- function(current_brand,current_rxn,current_date_range) { 
   # connect to CV database
