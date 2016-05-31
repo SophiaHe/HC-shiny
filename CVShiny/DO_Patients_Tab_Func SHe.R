@@ -11,7 +11,7 @@ patients_tab <- function( current_brand, current_rxn,current_date_range) {
   
   # Import tables with particular search items with method to deal with unspecified search term
   cv_reports_sorted_pt <- cv_reports %>%
-                          select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG, AGE_GROUP_CLEAN) %>%
+                          select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG, AGE_Y,AGE_GROUP_CLEAN) %>%
                           filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
                           #filter(DATINTRECEIVED_CLEAN >= date_ini) %>%
                           #filter(DATINTRECEIVED_CLEAN <= date_end)
