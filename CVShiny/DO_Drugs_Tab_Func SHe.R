@@ -65,7 +65,7 @@ drugs_tab_topdrg <- function(current_brand,current_rxn,current_date_range) {
   # connect to CV database
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   
-  setwd("~/CV_Shiny_DrugTabOnly")
+  setwd("~/CVShiny")
   source("DO_Drugs_Tab_Func SHe.R")
   df <- drugs_tab_indt(current_brand = current_brand, current_rxn = current_rxn, current_date_range=current_date_range)
  
@@ -81,8 +81,6 @@ drugs_tab_topdrg <- function(current_brand,current_rxn,current_date_range) {
   cv_reports_sorted_drg <- cv_reports %>%
                             select(REPORT_ID, DATINTRECEIVED_CLEAN) %>%
                             filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
-                            #filter(DATINTRECEIVED_CLEAN >= date_ini) %>%
-                            #filter(DATINTRECEIVED_CLEAN <= date_end)
   
   cv_report_drug_drg <- if(is.na(current_brand) == FALSE){
                           cv_report_drug %>%
