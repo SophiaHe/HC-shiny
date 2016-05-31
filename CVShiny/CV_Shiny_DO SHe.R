@@ -144,7 +144,7 @@ ui <- dashboardPage(
               fluidRow(
                 box(htmlOutput("sexplot"),
                     tags$br(),
-                    tags$p("Unknown includes both reports explicitly marked unknown and reports with no gender information."),
+                    tags$p("Unknown includes reports explicitly marked unknown and Not Specified includes reports with no gender information."),
                     title = tags$h2("Gender"), width = 4),
                 box(htmlOutput("agegroupplot"),
                     tags$br(),
