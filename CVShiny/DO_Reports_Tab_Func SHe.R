@@ -11,17 +11,15 @@ reports_tab <- function(current_brand,current_rxn,current_date_range) {
   # connect to CV database
   #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   #escape.POSIXt <- dplyr:::escape.Date
-  #cv_reports <- tbl(hcopen, "cv_reports") 
+  #cv_reports <- tbl(hcopen, "cv_reports")
   #cv_report_drug <- tbl(hcopen,"cv_report_drug")
-  #cv_reactions <- tbl(hcopen,"cv_reactions") 
+  #cv_reactions <- tbl(hcopen,"cv_reactions")
   
   #ptm <- proc.time()
   cv_reports_sorted_rp <- cv_reports %>%
                           select(REPORT_ID, SERIOUSNESS_ENG, REPORTER_TYPE_ENG, DEATH, DISABILITY, CONGENITAL_ANOMALY,LIFE_THREATENING, HOSP_REQUIRED, 
                                  OTHER_MEDICALLY_IMP_COND, DATINTRECEIVED_CLEAN) %>%
                           filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
-                          #filter(DATINTRECEIVED_CLEAN >= date_ini) %>%
-                          #filter(DATINTRECEIVED_CLEAN <= date_end)
   #proc.time() - ptm
   cv_report_drug_rp <- if(is.na(current_brand) == FALSE){
                         cv_report_drug %>%
