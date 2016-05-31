@@ -47,15 +47,13 @@ adrplot <- function(adrplot_test, plottitle){
     mutate( plot_date = floor_date(ymd(adrplot_test$DATINTRECEIVED_CLEAN), "month")) %>%
     select(REPORT_ID,plot_date)
   
-  nreports <- ddply(adrplot_test,"plot_date",count_func)
-  total_reports <- sum(nreports$n)
-  
+  nreports <- dplyr::summarise(group_by(adrplot_test,plot_date),count=n_distinct(REPORT_ID))
+  total_reports <- sum(nreports$count)
   
   plottitle1 <- paste(plottitle, " (", total_reports, " reports)") 
   
-  
   plot <- nreports %>%
-    ggplot(aes(x = plot_date, y = n)) +
+    ggplot(aes(x = plot_date, y = count)) +
     geom_line(stat = "identity", size = 0.1) +
     stat_smooth(method = "loess", size = 0.1) +
     ggtitle(plottitle1) + 
@@ -65,13 +63,8 @@ adrplot <- function(adrplot_test, plottitle){
     theme(plot.title = element_text(lineheight=.8, face="bold"))
   
   # ggplotly(p= plot)
-  
-  
 }
 
-# format1K <- function(x){
-#   x/1000
-# }
 
 
 ############ UI for REPORT Tab shiny ################
@@ -164,22 +157,40 @@ ui <- dashboardPage(
               fluidRow(
                 box(plotOutput("indicationplot"),
                     tags$br(),
-                    tags$p("This plot includes all indications for all drugs associated with the matching reports."), width = 4),
+                    tags$p("This plot includes top_10 indications for drugs associated with the matching reports."), width = 4),
                 box(plotOutput("drugplot"),
                     tags$br(),
-                    tags$p("This plot includes top_25 most-reported drugs with most-reported indication assocaiated with the seached drug."), width = 4)
+                    tags$p("This plot includes top_10 most-reported drugs with most-reported indication assocaiated with the seached drug."), width = 4)
                     )
                     ),
       tabItem(tabName = "rxndata",
               fluidRow(
-                box(htmlOutput("outcomeplot"), title = tags$h2("Outcomes (all reactions)"))
+                box(htmlOutput("outcomeplot"), title = tags$h2("Outcomes (all reactions)")),
+                box(plotOutput("rxnTbl"), title = tags$h2("Top25 Reactions Associated with Searched Drug"))
               )
       ),
       tabItem(tabName = "aboutinfo",
-              tags$p("Data provided by the Canada Vigilance Adverse Reaction Online Database (http://www.hc-sc.gc.ca/dhp-mps/medeff/databasdon/index-eng.php)"),
-              tags$h2("This is a prototyping platform to utilize open data sources (e.g. Canada Vigilance Adverse Reaction Online Database) 
+              tags$h2("About the Shiny App"),
+              tags$p("This is a prototyping platform to utilize open data sources (e.g. Canada Vigilance Adverse Reaction Online Database) 
                       and provide visualizations in an interactive format. Further analysis can be conducted and added onto this platform to make 
-                      better use of the data.")
+                      better use of the data. Data provided by the Canada Vigilance Adverse Reaction Online Database: "),
+              tags$a(href="http://www.hc-sc.gc.ca/dhp-mps/medeff/databasdon/index-eng.php", "Click here!"),
+              tags$br(),
+              tags$strong("Authors:"),
+              fluidRow(
+                box(
+                  tags$p("Daniel Buijs, MSc"),
+                  tags$p("Data Scientist, Health Products and Food Branch"),
+                  tags$p("Health Canada / Government of Canada"),
+                  tags$p("daniel.buijs@hc-sc.gc.ca")
+                ),
+                box(
+                tags$p("Sophia He, BSc in Progress"),
+                tags$p("Jr. Data Scientist Co-op, Health Products and Food Branch"),
+                tags$p("Health Canada / Government of Canada"),
+                tags$p("sophia.he@canada.ca")
+                )
+              )
       )
               )
     ), 
@@ -285,7 +296,7 @@ server <- function(input, output) {
                                 terms = c(current_brand,current_rxn,paste(current_date_range[1]," to ", current_date_range[2])),
                                 stringsAsFactors=FALSE)
 
-    search_tab_df$terms[is.na(search_tab_df$terms) == TRUE] <- "Not Specified"
+    search_tab_df$terms[is.na(search_tab_df$terms) == TRUE] <- "Not Specified (All)"
     return(search_tab_df)
   })
 
@@ -386,8 +397,6 @@ server <- function(input, output) {
     source("DO_Reactions_Tab_Func SHe.R")
     
     drugs_rxn_df <- drugs_rxn(current_brand=current_brand,current_date_range=current_date_range)
-    drugs_rxn_result <- dplyr::summarise(group_by(drugs_rxn_df, DRUGNAME,PT_NAME_ENG),count=n_distinct(REPORT_ID))%>% 
-                        top_n(10) %>% as.data.table(n=-1)
     
     return(drugs_rxn_result)
   })
@@ -414,7 +423,7 @@ server <- function(input, output) {
     #drug_selected <- "abc"
     
     # specify the title of time plot based on reactive choice
-    title <- ifelse(drug_selected == "Not Specified", "All Drugs",drug_selected)
+    title <- ifelse(drug_selected == "Not Specified (All)", "All Drugs",drug_selected)
     plottitle <- paste("Drug Adverse Event Reports for", title)
     p <- adrplot(adrplot_test = data, plottitle = plottitle)
     print(p)
@@ -472,36 +481,15 @@ server <- function(input, output) {
     total_serious <- dplyr::summarise(group_by(data, SERIOUSNESS_ENG),count=n_distinct(REPORT_ID))
     total_serious_final <- total_serious$count[total_serious$SERIOUSNESS_ENG == "Yes"]
     
-    # create NotSpecified Column to indicate serious report with no reasons specified
-    serious_reason <-data %>%
-      filter(SERIOUSNESS_ENG == "Yes" & is.na(DEATH) == TRUE & is.na(DISABILITY)==TRUE & is.na(CONGENITAL_ANOMALY)==TRUE & is.na(LIFE_THREATENING)==TRUE & 
-               is.na(HOSP_REQUIRED)==TRUE & is.na(OTHER_MEDICALLY_IMP_COND) == TRUE) %>%
-      mutate(NotSpecified = "Yes")%>%
-      select(REPORT_ID, NotSpecified) 
-    serious_reason_df <- left_join(data,serious_reason)%>% mutate(SERIOUSNESS_ENG = ifelse(REPORT_ID == 645744, "Yes", SERIOUSNESS_ENG))
+
+    serious_reason_df <- data %>% mutate(SERIOUSNESS_ENG = ifelse(REPORT_ID == 645744, "Yes", SERIOUSNESS_ENG))
     # REPORT_ID = 645744 has serious_reason specifed but seriousness_eng is balnk
-    
-    
-    # NotSpecified
-    #NotSpecified_results <- ddply(serious_reason_df,c("SERIOUSNESS_ENG","NotSpecified"),count_func)
-    NotSpecified_results <- dplyr::summarise(group_by(serious_reason_df, SERIOUSNESS_ENG,NotSpecified),count=n_distinct(REPORT_ID))
-    
-    if(any(NotSpecified_results$NotSpecified == "Yes") ==TRUE){
-      NotSpecified_results_final <- filter(NotSpecified_results,SERIOUSNESS_ENG == "Yes",NotSpecified == "Yes")%>%
-        mutate(Reasons = "NotSpecified")%>%
-        ungroup() %>%
-        select(Reasons,count) 
-    } else {
-      Reasons <- I("NotSpecified")
-      count <- c(0)
-      NotSpecified_results_final <- data.frame(Reasons,count)
-    }
-    
+
     # Congenital               
     #congenital_results <- ddply(serious_reason_df,c("SERIOUSNESS_ENG","CONGENITAL_ANOMALY"),count_func)
     congenital_results <- dplyr::summarise(group_by(serious_reason_df, SERIOUSNESS_ENG,CONGENITAL_ANOMALY),count=n_distinct(REPORT_ID))
     
-    if(any(congenital_results$CONGENITAL_ANOMALY == 1) ==TRUE){
+    if(any(congenital_results$CONGENITAL_ANOMALY == 1, na.rm=TRUE) ==TRUE){
       congenital_results_final <- filter(congenital_results,SERIOUSNESS_ENG == "Yes", CONGENITAL_ANOMALY == 1)%>%
         mutate(Reasons = "CONGENITAL ANOMALY")%>%
         ungroup() %>%
@@ -516,7 +504,7 @@ server <- function(input, output) {
     #death_results <- ddply(serious_reason_df, c("SERIOUSNESS_ENG", "DEATH"),count_func)
     death_results <- dplyr::summarise(group_by(serious_reason_df, SERIOUSNESS_ENG,DEATH),count=n_distinct(REPORT_ID))
     
-    if(any(death_results$DEATH == 1) ==TRUE){
+    if(any(death_results$DEATH == 1, na.rm=TRUE) ==TRUE){
       death_results_final <- filter(death_results,SERIOUSNESS_ENG == "Yes", DEATH == 1)%>%
         mutate(Reasons = "DEATH")%>%
         ungroup() %>%
@@ -531,7 +519,7 @@ server <- function(input, output) {
     #disabling_results <-  ddply(serious_reason_df, c("SERIOUSNESS_ENG", "DISABILITY"),count_func)
     disabling_results <- dplyr::summarise(group_by(serious_reason_df, SERIOUSNESS_ENG,DISABILITY),count=n_distinct(REPORT_ID))
     
-    if(any(disabling_results$DISABILITY == 1) ==TRUE){
+    if(any(disabling_results$DISABILITY == 1, na.rm=TRUE) ==TRUE){
       disabling_results_final <- filter(disabling_results,SERIOUSNESS_ENG == "Yes", DISABILITY == 1)%>%
         mutate(Reasons = "DISABILITY")%>%
         ungroup() %>%
@@ -546,7 +534,7 @@ server <- function(input, output) {
     #hospital_results <- ddply(serious_reason_df,c("SERIOUSNESS_ENG","HOSP_REQUIRED"),count_func)
     hospital_results <- dplyr::summarise(group_by(serious_reason_df, SERIOUSNESS_ENG,HOSP_REQUIRED),count=n_distinct(REPORT_ID))
     
-    if(any(hospital_results$HOSP_REQUIRED == 1) ==TRUE ) {
+    if(any(hospital_results$HOSP_REQUIRED == 1, na.rm=TRUE) ==TRUE ) {
       hospital_results_final <- filter(hospital_results,SERIOUSNESS_ENG == "Yes",HOSP_REQUIRED == 1) %>%
         mutate(Reasons = "HOSPITALIZATION") %>%
         ungroup() %>%
@@ -561,7 +549,7 @@ server <- function(input, output) {
     #lifethreaten_results <- ddply(serious_reason_df, c("SERIOUSNESS_ENG", "LIFE_THREATENING"),count_func)
     lifethreaten_results <- dplyr::summarise(group_by(serious_reason_df, SERIOUSNESS_ENG,LIFE_THREATENING),count=n_distinct(REPORT_ID))
     
-    if(any(lifethreaten_results$LIFE_THREATENING == 1) ==TRUE){
+    if(any(lifethreaten_results$LIFE_THREATENING == 1, na.rm=TRUE) ==TRUE){
       lifethreaten_results_final <- filter(lifethreaten_results,SERIOUSNESS_ENG == "Yes", LIFE_THREATENING == 1)%>%
         mutate(Reasons = "LIFE_THREATENING")%>%
         ungroup() %>%
@@ -576,7 +564,7 @@ server <- function(input, output) {
     #serother_results <- ddply(serious_reason_df, c("SERIOUSNESS_ENG", "OTHER_MEDICALLY_IMP_COND"),count_func)
     serother_results <- dplyr::summarise(group_by(serious_reason_df, SERIOUSNESS_ENG,OTHER_MEDICALLY_IMP_COND),count=n_distinct(REPORT_ID))
     
-    if(any(serother_results$OTHER_MEDICALLY_IMP_COND == 1) ==TRUE){
+    if(any(serother_results$OTHER_MEDICALLY_IMP_COND == 1, na.rm=TRUE) ==TRUE){
       serother_results_final <-filter(serother_results,SERIOUSNESS_ENG == "Yes", OTHER_MEDICALLY_IMP_COND == 1)%>%
         mutate(Reasons = "OTHER_MEDICALLY_IMP_COND")%>%
         ungroup() %>%
@@ -587,15 +575,50 @@ server <- function(input, output) {
       serother_results_final <- data.frame(Reasons,count)
     }
     
-    # Combine all SeriousReasons Frequency tables together
-    serious_reasons_restults <- congenital_results_final %>%
-      full_join(death_results_final) %>%
-      full_join(disabling_results_final) %>%
-      full_join(hospital_results_final) %>%
-      full_join(lifethreaten_results_final) %>%
-      full_join(NotSpecified_results_final) %>%
-      full_join(serother_results_final)
+## Check for NotSpecified ##
+    serious_reason <-data %>%
+      filter(SERIOUSNESS_ENG == "Yes" & is.na(DEATH) == TRUE & is.na(DISABILITY)==TRUE & is.na(CONGENITAL_ANOMALY)==TRUE & is.na(LIFE_THREATENING)==TRUE & 
+               is.na(HOSP_REQUIRED)==TRUE & is.na(OTHER_MEDICALLY_IMP_COND) == TRUE)
     
+    if(nrow(serious_reason)!=0){
+      serious_reason <- serious_reason %>% 
+        mutate(NotSpecified = "Yes")%>%
+        select(REPORT_ID, NotSpecified) 
+      serious_reason_df <- left_join(data,serious_reason)%>% mutate(SERIOUSNESS_ENG = ifelse(REPORT_ID == 645744, "Yes", SERIOUSNESS_ENG))
+      
+      # NotSpecified
+      #NotSpecified_results <- ddply(serious_reason_df,c("SERIOUSNESS_ENG","NotSpecified"),count_func)
+      NotSpecified_results <- dplyr::summarise(group_by(serious_reason_df, SERIOUSNESS_ENG,NotSpecified),count=n_distinct(REPORT_ID))
+      
+      if(any(NotSpecified_results$NotSpecified == "Yes", na.rm=TRUE) ==TRUE){
+        NotSpecified_results_final <- filter(NotSpecified_results,SERIOUSNESS_ENG == "Yes",NotSpecified == "Yes")%>%
+          mutate(Reasons = "NotSpecified")%>%
+          ungroup() %>%
+          select(Reasons,count) 
+      } else {
+        Reasons <- I("NotSpecified")
+        count <- c(0)
+        NotSpecified_results_final <- data.frame(Reasons,count)
+      }
+      # Combine all SeriousReasons Frequency tables with NotSpecified
+      serious_reasons_restults <- congenital_results_final %>%
+        full_join(death_results_final) %>%
+        full_join(disabling_results_final) %>%
+        full_join(hospital_results_final) %>%
+        full_join(lifethreaten_results_final) %>%
+        full_join(serother_results_final)%>%
+        full_join(NotSpecified_results_final)
+      
+    } else {
+      # Combine all SeriousReasons Frequency tables WITHOUT NotSpecified
+      serious_reasons_restults <- congenital_results_final %>%
+        full_join(death_results_final) %>%
+        full_join(disabling_results_final) %>%
+        full_join(hospital_results_final) %>%
+        full_join(lifethreaten_results_final) %>%
+        full_join(serother_results_final) 
+    }
+ 
     # Calculate the percentage of each reason
     serious_reasons_restults <- mutate(serious_reasons_restults, percentage = count/total_serious_final*100 %>% signif(digits = 3)) %>% 
       select(-count) %>%
@@ -651,22 +674,22 @@ server <- function(input, output) {
     
     # Age groups frequency table
     age_groups <- dplyr::summarise(group_by(data, AGE_GROUP_CLEAN),count=n_distinct(REPORT_ID))
-    
-    age_groups_hist <- age_groups %>% filter(AGE_GROUP_CLEAN != "Unknown") #exclude the unknown
-    
     unknown <- age_groups$count[age_groups$AGE_GROUP_CLEAN == "Unknown"]
     
     plottitle <- paste0("Histogram of Patient Ages")
     if(unknown > 0) plottitle <- paste0(plottitle, "<br>(", unknown, "Reports with Unknown Age Group Excluded)")
     
-    hist <- ggplot(age_groups_hist, aes(x = AGE_GROUP_CLEAN,  weight=count, fill=AGE_GROUP_CLEAN)) +
-      geom_bar()+
+    age_groups_hist <- data %>% filter(AGE_GROUP_CLEAN != "Unknown") #exclude the unknown
+    
+    hist <- ggplot(age_groups_hist, aes(x = AGE_Y, fill=AGE_GROUP_CLEAN)) +
+      geom_histogram()+
       ggtitle(plottitle) + 
       xlab("Age at onset (years)") + 
       ylab("Number of Reports") +
       theme_bw() +
       theme(plot.title = element_text(lineheight=.8, size = rel(0.85),face="bold")) + 
-      theme(axis.title.x = element_text(size = rel(0.8)))
+      theme(axis.title.x = element_text(size = rel(0.8)))+
+      scale_x_continuous(limits=c(0,130))
     
     print(hist)
     ggplotly(hist)
@@ -679,15 +702,15 @@ server <- function(input, output) {
     data <- cv_drug_tab_topdrg()
     
     drugs <-  dplyr::summarise(group_by(data, DRUGNAME),count=n_distinct(REPORT_ID))
-    drugs_sorted<- drugs %>% dplyr::arrange(desc(count)) %>% top_n(n=25) 
+    drugs_sorted<- drugs %>% dplyr::arrange(desc(count)) %>% top_n(n=10) 
     # the top drugs reported here might be influenced by such drug is originally most reported among all reports
     
     library(scales)
     p <- ggplot(drugs_sorted, aes(x = DRUGNAME, y = count, fill = DRUGNAME)) + 
       geom_bar(stat = "identity") + 
-      scale_x_discrete(limits = rev(drugs_sorted$DRUGNAME[1:25])) + 
+      scale_x_discrete(limits = rev(drugs_sorted$DRUGNAME[1:10])) + 
       coord_flip() +
-      ggtitle("Top 25 Drugs (in addition to search term)") +
+      ggtitle("Top 10 Drugs (in addition to search term)") +
       xlab("Drug (brand name)") + 
       ylab("Number of Reports") +
       theme_bw() +
@@ -705,14 +728,14 @@ server <- function(input, output) {
     # data <-drugs_tab(current_generic="phenytoin",current_brand="DILANTIN",current_rxn=NA,date_ini=ymd("19650101"),date_end=ymd("20151231"))
     
     indications <-  dplyr::summarise(group_by(data, INDICATION_NAME_ENG),count=n_distinct(REPORT_ID))
-    indications_sorted<- indications %>% dplyr::arrange(desc(count)) %>% top_n(n=25)
+    indications_sorted<- indications %>% dplyr::arrange(desc(count)) %>% top_n(n=10)
     
     library(scales)
     p <- ggplot(indications_sorted, aes(x = INDICATION_NAME_ENG, y = count, fill = INDICATION_NAME_ENG)) + 
       geom_bar(stat = "identity") + 
       scale_x_discrete(limits = rev(indications_sorted$INDICATION_NAME_ENG)) + 
       coord_flip() +
-      ggtitle("Top 25 Indications (All Drugs)") +
+      ggtitle("Top 10 Indications") +
       xlab("Indication") + 
       ylab("Number") +
       theme_bw() +
@@ -733,9 +756,6 @@ server <- function(input, output) {
   output$outcomeplot <- renderGvis({
     data <- cv_reactions_tab()
     
-    #test
-    # data <- reactions_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
-    
     outcome_results <-  dplyr::summarise(group_by(data, OUTCOME_ENG),count=n_distinct(REPORT_ID))
     
     gvisPieChart(outcome_results, 
@@ -744,9 +764,25 @@ server <- function(input, output) {
                  options = list(pieHole = 0.4))
   })
   
-  output$rxnTbl <- renderDataTable(
+  output$rxnTbl <- renderPlot({
     data <- cv_reactions_tbl()
-  )
+    
+    library(scales)
+    p <- ggplot(data, aes(x = PT_NAME_ENG, y = count, fill = PT_NAME_ENG)) +
+      geom_bar(stat = "identity") +
+      scale_x_discrete(limits = rev(data$PT_NAME_ENG)) +
+      coord_flip() +
+      ggtitle("Top 10 Reactions Associated with Searched Drug") +
+      xlab("Reactions") +
+      ylab("Number") +
+      theme_bw() +
+      theme(plot.title = element_text(lineheight=.8, face="bold"),
+            legend.position = "none") +
+      scale_y_continuous(limits=  c(0, max(data$count)))
+    p
+    print(p)
+    ggplotly(p)
+  })
 }
 
 shinyApp(ui, server)
