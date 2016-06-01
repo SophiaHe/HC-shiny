@@ -166,7 +166,11 @@ ui <- dashboardPage(
       tabItem(tabName = "rxndata",
               fluidRow(
                 box(htmlOutput("outcomeplot"), title = tags$h2("Outcomes (all reactions)")),
-                box(htmlOutput("rxnTbl"), title = tags$h2("Top10 Reactions Associated with Searched Drug"))
+                box(htmlOutput("rxnTbl"), title = tags$h2("Top10 Reactions Associated with Searched Drug")),
+                box(
+                  tags$h2("Download Data Used for Current Tab"),
+                  downloadButton('downloadData_RXN', 'Download')
+                )
               )
       ),
       tabItem(tabName = "aboutinfo",
@@ -401,8 +405,14 @@ server <- function(input, output) {
     return(drugs_rxn_df)
   })
 #########################################################################################################################################
-  
-  
+
+  ############# Download table for each tab #################
+  output$downloadData_RXN <- downloadHandler(
+    filename = function() { paste('RXNTab_outcome', '.csv', sep='') },
+    content = function(file) {
+      write.csv(cv_reactions_tab(), file)
+    }
+  )
   
   
   
