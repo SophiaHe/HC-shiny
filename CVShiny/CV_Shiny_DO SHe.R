@@ -12,7 +12,7 @@ library(googleVis)
 # library(openfda)
 library(stringr)
 library(plyr)
-library(data.table)
+
 
 
 ########## Codes to fetch top 1000 specific results to be used in dropdown menu ###############
@@ -79,7 +79,7 @@ ui <- dashboardPage(
       menuItem("About", tabName = "aboutinfo", icon = icon("info"))
     ),
     selectizeInput("search_brand", 
-                   "Brand Name (US Trade Name)",
+                   "Brand Name/Drug",
                    topbrands$DRUGNAME,
                    options = list(create = TRUE,
                                   placeholder = 'Please select an option below',
@@ -166,7 +166,7 @@ ui <- dashboardPage(
       tabItem(tabName = "rxndata",
               fluidRow(
                 box(htmlOutput("outcomeplot"), title = tags$h2("Outcomes (all reactions)")),
-                box(plotOutput("rxnTbl"), title = tags$h2("Top25 Reactions Associated with Searched Drug"))
+                box(htmlOutput("rxnTbl"), title = tags$h2("Top10 Reactions Associated with Searched Drug"))
               )
       ),
       tabItem(tabName = "aboutinfo",
@@ -203,7 +203,7 @@ ui <- dashboardPage(
 hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
 
 #options(shiny.error = browser)
-# options(shiny.trace = TRUE, shiny.reactlog=TRUE)
+options(shiny.trace = TRUE, shiny.reactlog=TRUE)
 
 
 ############### Server Functions ###################
@@ -398,7 +398,7 @@ server <- function(input, output) {
     
     drugs_rxn_df <- drugs_rxn(current_brand=current_brand,current_date_range=current_date_range)
     
-    return(drugs_rxn_result)
+    return(drugs_rxn_df)
   })
 #########################################################################################################################################
   
@@ -764,25 +764,26 @@ server <- function(input, output) {
                  options = list(pieHole = 0.4))
   })
   
-  output$rxnTbl <- renderPlot({
+  output$rxnTbl <- renderGvis({
     data <- cv_reactions_tbl()
-    
-    library(scales)
-    p <- ggplot(data, aes(x = PT_NAME_ENG, y = count, fill = PT_NAME_ENG)) +
-      geom_bar(stat = "identity") +
-      scale_x_discrete(limits = rev(data$PT_NAME_ENG)) +
-      coord_flip() +
-      ggtitle("Top 10 Reactions Associated with Searched Drug") +
-      xlab("Reactions") +
-      ylab("Number") +
-      theme_bw() +
-      theme(plot.title = element_text(lineheight=.8, face="bold"),
-            legend.position = "none") +
-      scale_y_continuous(limits=  c(0, max(data$count)))
-    p
-    print(p)
-    ggplotly(p)
+
+    # GoogleVis plot html: use plot() to graph it
+    gvisBarChart(data,
+                      xvar = "PT_NAME_ENG",
+                      yvar = "count",
+                      options = list(
+                        #vAxes="[{title:'Reactions'}",
+                        legend = "{position:'none'}",
+                        bars = 'horizontal',
+                        axes= "x: {
+                                 0: { side: 'top', label: 'Number of Reports'}}",
+                        bar = list(groupWidth =  '90%'),
+                        height=500
+                      )
+    )
+
   })
 }
 
 shinyApp(ui, server)
+
