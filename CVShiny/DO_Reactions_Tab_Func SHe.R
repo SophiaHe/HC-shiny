@@ -49,23 +49,22 @@ reactions_tab <- function(current_brand,current_rxn,current_date_range) {
 drugs_rxn <- function(current_brand,current_date_range){
   if(is.na(current_brand) == FALSE){
     cv_report_drug_rxn <- cv_report_drug %>%
-                            select(REPORT_ID,DRUGNAME) %>%
-                            filter(DRUGNAME == current_brand)
+      select(REPORT_ID,DRUGNAME) %>%
+      filter(DRUGNAME == current_brand)
     
-    cv_reactions_rxn <- cv_reactions %>%
-                          select(REPORT_ID, PT_NAME_ENG)
-                        
+    cv_reactions_rxn <- cv_reactions %>% select(REPORT_ID, PT_NAME_ENG)
+    
     drugs_rxn_df <- cv_reactions_rxn %>% inner_join(cv_report_drug_rxn) %>% collect()
     drugs_rxn_result <- dplyr::summarise(group_by(drugs_rxn_df, DRUGNAME,PT_NAME_ENG),count=n_distinct(REPORT_ID))%>% 
       dplyr::arrange(desc(count))%>%
-      as.data.table(n=25)
+      top_n(10) %>%
+      collect()
   } else {
-    cv_reactions_dm <- cv_reactions %>% select(REPORT_ID, PT_NAME_ENG)
+    cv_reactions_rxn  <- cv_reactions %>% select(REPORT_ID, PT_NAME_ENG)
     
-    toprxn <- dplyr::summarise(group_by(cv_reactions_dm, PT_NAME_ENG),count=n_distinct(REPORT_ID))
-    drug_rxn_result <- toprxn %>% dplyr::arrange(desc(count)) %>% top_n(25) %>% select(PT_NAME_ENG, count)%>% as.data.table(n=-1)
+    toprxn <- dplyr::summarise(group_by(cv_reactions_rxn, PT_NAME_ENG),count=n_distinct(REPORT_ID))
+    drugs_rxn_result <- toprxn %>% dplyr::arrange(desc(count)) %>% top_n(10) %>% select(PT_NAME_ENG, count) %>% collect()
   }
   
-  return(drug_rxn_result)
-  
+  return(drugs_rxn_result)
 }
