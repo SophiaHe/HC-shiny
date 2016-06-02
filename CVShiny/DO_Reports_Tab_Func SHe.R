@@ -2,12 +2,13 @@
 #                          OTHER_MEDICALLY_IMP_COND)
 #              Report_Drug (REPORT_ID, DRUGNAME)
 
-#current_brand <- "REMICADE"
-#current_rxn <- NA
-#current_date_range <- c(ymd("19650101", ymd("20160527")))
+current_brand <- NA
+current_rxn <- NA
+current_gender <- "Male"
+current_date_range <- c(ymd("19650101", ymd("20160527")))
 
 
-reports_tab <- function(current_brand,current_rxn,current_date_range) { 
+reports_tab <- function(current_brand,current_rxn,current_gender,current_date_range) { 
   # connect to CV database
   #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   #escape.POSIXt <- dplyr:::escape.Date
@@ -16,10 +17,19 @@ reports_tab <- function(current_brand,current_rxn,current_date_range) {
   #cv_reactions <- tbl(hcopen,"cv_reactions")
   
   #ptm <- proc.time()
-  cv_reports_sorted_rp <- cv_reports %>%
+  cv_reports_sorted_rp <- if(current_gender != "All"){
+                          cv_reports %>%
                           select(REPORT_ID, SERIOUSNESS_ENG, REPORTER_TYPE_ENG, DEATH, DISABILITY, CONGENITAL_ANOMALY,LIFE_THREATENING, HOSP_REQUIRED, 
-                                 OTHER_MEDICALLY_IMP_COND, DATINTRECEIVED_CLEAN) %>%
-                          filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
+                                 OTHER_MEDICALLY_IMP_COND, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
+                          filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2], GENDER_ENG == current_gender)
+                          } else {
+                            cv_reports %>%
+                              select(REPORT_ID, SERIOUSNESS_ENG, REPORTER_TYPE_ENG, DEATH, DISABILITY, CONGENITAL_ANOMALY,LIFE_THREATENING, HOSP_REQUIRED, 
+                                     OTHER_MEDICALLY_IMP_COND, DATINTRECEIVED_CLEAN,GENDER_ENG) %>%
+                              filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
+                                      }
+      
+                
   #proc.time() - ptm
   cv_report_drug_rp <- if(is.na(current_brand) == FALSE){
                         cv_report_drug %>%
