@@ -2,7 +2,7 @@
 #              Report_Drug (REPORT_ID, DRUGNAME)
 
 
-patients_tab <- function( current_brand, current_rxn,current_date_range) { 
+patients_tab <- function( current_brand, current_rxn,current_gender,current_date_range) { 
   # connect to CV database
   #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   
@@ -12,10 +12,7 @@ patients_tab <- function( current_brand, current_rxn,current_date_range) {
   # Import tables with particular search items with method to deal with unspecified search term
   cv_reports_sorted_pt <- cv_reports %>%
                           select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG, AGE_Y,AGE_GROUP_CLEAN) %>%
-                          filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
-                          #filter(DATINTRECEIVED_CLEAN >= date_ini) %>%
-                          #filter(DATINTRECEIVED_CLEAN <= date_end)
-  
+                          filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2],GENDER_ENG == current_gender)
   
   cv_report_drug_pt <- if(is.na(current_brand) == FALSE){
                           cv_report_drug %>%
