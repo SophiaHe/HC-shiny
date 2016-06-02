@@ -81,6 +81,7 @@ ui <- dashboardPage(
     selectizeInput("search_brand", 
                    "Brand Name/Drug",
                    topbrands$DRUGNAME,
+                   #multiple = TRUE,
                    options = list(create = TRUE,
                                   placeholder = 'Please select an option below',
                                   onInitialize = I('function() { this.setValue(""); }'))),
@@ -96,15 +97,14 @@ ui <- dashboardPage(
                   end = Sys.Date(),
                   startview = "year",
                   format = "yyyy-mm-dd"),
-    # dateInput("search_date_ini",
-    #           label = 'Date initial input: yyyy-mm-dd',
-    #           value = "1965-01-01"
-    # ),
-    # 
-    # dateInput("search_date_end",
-    #           label = 'Date end input: yyyy-mm-dd',
-    #           value = Sys.Date()
-    # ),
+    ##add more menu filter here
+    
+    selectizeInput("search_gender",
+                   "Gender",
+                   choices = c("All", "Male", "Female"),  #"Not specified", "Unknown"
+                   options = list(create = TRUE,
+                                  placeholder = 'Please select an option below',
+                                  onInitialize = I('function() { this.setValue(""); }'))),
     
     actionButton("searchButton", "Search"),
     tags$br(),
@@ -266,12 +266,15 @@ server <- function(input, output) {
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
                                   input$search_rxn))
+    current_gender <- isolate(ifelse(input$search_gender == "",
+                                     "All",
+                                     input$search_gender))
     current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
 
     setwd("~/CVShiny")
     source("DO_Reports_Tab_Func SHe.R")
-    reports_tab_df <- reports_tab(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
+    reports_tab_df <- reports_tab(current_brand=current_brand,current_rxn=current_rxn,current_gender =current_gender,current_date_range=current_date_range)
 
     return(reports_tab_df)
   })
@@ -291,13 +294,17 @@ server <- function(input, output) {
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
                                   input$search_rxn))
+    current_gender <- isolate(ifelse(input$search_gender == "",
+                                     "All",
+                                     input$search_gender))
     current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
 
     search_tab_df <- data.frame(names = c("Brand Name:",
                                           "Adverse Reaction Term:",
+                                          "Gender",
                                           "Date Range:"),
-                                terms = c(current_brand,current_rxn,paste(current_date_range[1]," to ", current_date_range[2])),
+                                terms = c(current_brand,current_rxn,current_gender,paste(current_date_range[1]," to ", current_date_range[2])),
                                 stringsAsFactors=FALSE)
 
     search_tab_df$terms[is.na(search_tab_df$terms) == TRUE] <- "Not Specified (All)"
@@ -314,14 +321,17 @@ server <- function(input, output) {
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
                                   input$search_rxn))
+    current_gender <- isolate(ifelse(input$search_gender == "",
+                                     "All",
+                                     input$search_gender))
     current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
 
     setwd("~/CVShiny")
     source("DO_Patients_Tab_Func SHe.R")
 
-    patients_tab_df <- patients_tab(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
-
+    patients_tab_df <- patients_tab(current_brand=current_brand,current_rxn=current_rxn,current_gender =current_gender,current_date_range=current_date_range)
+    
     return(patients_tab_df)
   })
 
@@ -377,13 +387,16 @@ server <- function(input, output) {
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
                                   input$search_rxn))
+    current_gender <- isolate(ifelse(input$search_gender == "",
+                                     "All",
+                                     input$search_gender))
     current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
 
     setwd("~/CVShiny")
     source("DO_Reactions_Tab_Func SHe.R")
 
-    reactions_tab_df <- reactions_tab(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
+    reactions_tab_df <- reactions_tab(current_brand=current_brand,current_rxn=current_rxn,current_gender = current_gender,current_date_range=current_date_range)
 
     return(reactions_tab_df)
   })
@@ -668,11 +681,18 @@ server <- function(input, output) {
   ################ Create Age Group pie chart in Patient tab ##################      
   output$agegroupplot <- renderGvis({
     data <- cv_patients_tab()
+
+    data1 <- cv_search_tab()
+    gender_selected <- data1$terms[3]
     
-    # Age groups frequency table
-    age_groups <- dplyr::summarise(group_by(data, AGE_GROUP_CLEAN),count=n_distinct(REPORT_ID))
+    if(gender_selected == "All"){
+      patients_tab_output <- dplyr::summarise(group_by(data,AGE_GROUP_CLEAN),count=n_distinct(REPORT_ID))
+    } else {
+      patients_tab_df1 <- filter(data,GENDER_ENG == current_gender)
+      patients_tab_output <- dplyr::summarise(group_by(patients_tab_df1,AGE_GROUP_CLEAN),count=n_distinct(REPORT_ID))
+    }
     
-    gvisPieChart(age_groups, 
+    gvisPieChart(patients_tab_output, 
                  labelvar = "AGE_GROUP_CLEAN",
                  numvar = "n", 
                  options = list(pieHole = 0.4, pieSliceText='percentage', fontSize=12) )
