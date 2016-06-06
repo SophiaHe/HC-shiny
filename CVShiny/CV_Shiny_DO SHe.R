@@ -85,6 +85,7 @@ ui <- dashboardPage(
                    options = list(create = TRUE,
                                   placeholder = 'Please select an option below',
                                   onInitialize = I('function() { this.setValue(""); }'))),
+    
     selectizeInput("search_rxn", 
                    "Adverse Event Term",
                    toprxns$PT_NAME_ENG,
@@ -283,6 +284,8 @@ server <- function(input, output) {
   #output$outputReports <- renderTable({
   #  cv_reports_tab()[1:4,c("ACTIVE_INGREDIENT_NAME","DRUGNAME","DATINTRECEIVED_CLEAN","PT_NAME_ENG")]
   #})
+  
+  observe({updateSelectizeInput(session, )})
 
   #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   cv_search_tab <- reactive({
@@ -345,14 +348,17 @@ server <- function(input, output) {
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
                                   input$search_rxn))
+    current_gender <- isolate(ifelse(input$search_gender == "",
+                                     "All",
+                                     input$search_gender))
     current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
-
+    
     setwd("~/CVShiny")
     source("DO_Drugs_Tab_Func SHe.R")
-
-    drugs_tab_topdrg_df <- drugs_tab_topdrg(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
-
+    
+    drugs_tab_topdrg_df <- drugs_tab_topdrg(current_brand=current_brand,current_rxn=current_rxn,current_gender =current_gender,current_date_range=current_date_range)
+    
     return(drugs_tab_topdrg_df)
   })
 
@@ -366,14 +372,17 @@ server <- function(input, output) {
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   NA,
                                   input$search_rxn))
+    current_gender <- isolate(ifelse(input$search_gender == "",
+                                     "All",
+                                     input$search_gender))
     current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
-
+    
     setwd("~/CVShiny")
     source("DO_Drugs_Tab_Func SHe.R")
-
-    drugs_tab_indt_df <- drugs_tab_indt(current_brand=current_brand,current_rxn=current_rxn,current_date_range=current_date_range)
-
+    
+    drugs_tab_indt_df <- drugs_tab_indt(current_brand=current_brand,current_rxn=current_rxn,current_gender =current_gender,current_date_range=current_date_range)
+    
     return(drugs_tab_indt_df)
   })
 
@@ -667,7 +676,7 @@ server <- function(input, output) {
   output$sexplot <- renderGvis({
     data <- cv_patients_tab()
     
-    # replace blank in GENDER_ENG with character "Unknown" & convert it to factor in order to build freq table
+    # replace blank in GENDER_ENG with character "Unknown"
     data$GENDER_ENG[data$GENDER_ENG == ""] <- "Unknown"
     
     sex_results <-dplyr::summarise(group_by(data, GENDER_ENG),count=n_distinct(REPORT_ID))
@@ -682,19 +691,21 @@ server <- function(input, output) {
   output$agegroupplot <- renderGvis({
     data <- cv_patients_tab()
 
-    data1 <- cv_search_tab()
-    gender_selected <- data1$terms[3]
+    # data1 <- cv_search_tab()
+    # gender_selected <- data1$terms[3]
     
-    if(gender_selected == "All"){
-      patients_tab_output <- dplyr::summarise(group_by(data,AGE_GROUP_CLEAN),count=n_distinct(REPORT_ID))
-    } else {
-      patients_tab_df1 <- filter(data,GENDER_ENG == current_gender)
-      patients_tab_output <- dplyr::summarise(group_by(patients_tab_df1,AGE_GROUP_CLEAN),count=n_distinct(REPORT_ID))
-    }
+    patients_tab_output <- dplyr::summarise(group_by(data,AGE_GROUP_CLEAN),count=n_distinct(REPORT_ID))
+    # 
+    # if(gender_selected == "All"){
+    #   patients_tab_output <- dplyr::summarise(group_by(data,AGE_GROUP_CLEAN),count=n_distinct(REPORT_ID))
+    # } else {
+    #   #patients_tab_df1 <- filter(data,GENDER_ENG == current_gender)
+    #   patients_tab_output <- filter(data,GENDER_ENG == current_gender) %>% dplyr::summarise(group_by(AGE_GROUP_CLEAN),count=n_distinct(REPORT_ID))
+    # }
     
     gvisPieChart(patients_tab_output, 
                  labelvar = "AGE_GROUP_CLEAN",
-                 numvar = "n", 
+                 numvar = "count", 
                  options = list(pieHole = 0.4, pieSliceText='percentage', fontSize=12) )
   })
   
@@ -730,6 +741,8 @@ server <- function(input, output) {
   output$drugplot <- renderPlot({
     
     data <- cv_drug_tab_topdrg()
+    # replace blank in GENDER_ENG with character "Unknown"
+    data$GENDER_ENG[data$GENDER_ENG == ""] <- "Unknown"
     
     drugs <-  dplyr::summarise(group_by(data, DRUGNAME),count=n_distinct(REPORT_ID))
     drugs_sorted<- drugs %>% dplyr::arrange(desc(count)) %>% top_n(n=10) 
@@ -754,8 +767,9 @@ server <- function(input, output) {
   
   output$indicationplot <- renderPlot({
     data <- cv_drug_tab_indc()
-    # test
-    # data <-drugs_tab(current_generic="phenytoin",current_brand="DILANTIN",current_rxn=NA,date_ini=ymd("19650101"),date_end=ymd("20151231"))
+    # replace blank in GENDER_ENG with character "Unknown"
+    data$GENDER_ENG[data$GENDER_ENG == ""] <- "Unknown"
+    
     
     indications <-  dplyr::summarise(group_by(data, INDICATION_NAME_ENG),count=n_distinct(REPORT_ID))
     indications_sorted<- indications %>% dplyr::arrange(desc(count)) %>% top_n(n=10)
