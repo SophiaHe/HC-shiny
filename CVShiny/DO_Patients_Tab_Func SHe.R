@@ -10,10 +10,16 @@ patients_tab <- function( current_brand, current_rxn,current_gender,current_date
   #cv_report_drug <- tbl(hcopen,"cv_report_drug")
   
   # Import tables with particular search items with method to deal with unspecified search term
-  cv_reports_sorted_pt <- cv_reports %>%
-                          select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG, AGE_Y,AGE_GROUP_CLEAN) %>%
-                          filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2],GENDER_ENG == current_gender)
-  
+  cv_reports_sorted_pt <- if(current_gender != "All"){
+                          cv_reports %>%
+                            select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG, AGE_Y,AGE_GROUP_CLEAN) %>%
+                            filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2], GENDER_ENG == current_gender)
+                          } else {
+                            cv_reports %>%
+                              select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG, AGE_Y,AGE_GROUP_CLEAN) %>%
+                              filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])  
+                          }
+
   cv_report_drug_pt <- if(is.na(current_brand) == FALSE){
                           cv_report_drug %>%
                             select(REPORT_ID, DRUGNAME) %>%
