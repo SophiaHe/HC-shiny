@@ -32,9 +32,11 @@ source("DO_Dropdown_Menu_Func.R")
 #Fetch top 1000 most-reported brand/drug names
 topbrands <- topdrug_func(n=100)
 
-#Count the number of times each unique value of field patient.reaction.reactionmeddrapt occurs in records matching the search parameters.
+#Fetch top 1000 most-reported reaction names
 toprxns <- toprxn_func(n=100)
 
+#Fetch top 1000 most-reported ingredient names
+topingd <- topingd_func(n=100)
 
 ############### Create function ###################
 # function to plot adverse reaction plot
@@ -72,10 +74,12 @@ ui <- dashboardPage(
   dashboardHeader(title = "CV Shiny"),
   dashboardSidebar(
     sidebarMenu(
+      menuItem("Download", tabName = "downloaddata", icon = icon("fa fa-download")),
       menuItem("Reports", tabName = "reportdata", icon = icon("hospital-o")),
       menuItem("Drugs", tabName = "drugdata", icon = icon("flask")),
       menuItem("Patients", tabName = "patientdata", icon = icon("user-md")),
       menuItem("Reactions", tabName = "rxndata", icon = icon("heart-o")),
+      
       menuItem("About", tabName = "aboutinfo", icon = icon("info"))
     ),
     selectizeInput("search_brand", 
@@ -172,6 +176,40 @@ ui <- dashboardPage(
                   tags$h2("Download Data Used for Current Tab"),
                   downloadButton('downloadData_RXN', 'Download')
                 )
+              )
+      ),
+      
+      tabItem(tabName = "downloaddata",
+              fluidRow(
+                # box(plotOutput("indicationplot"),
+                #     tags$br(),
+                #     tags$p("This plot includes top_10 indications for drugs associated with the matching reports."), width = 4),
+                box(
+                title = tags$h2("Download Dataset for Disproportionality Analysis"),
+                selectizeInput("search_ingredient",
+                               "Active Ingredient",
+                               topingd$ACTIVE_INGREDIENT_NAME, 
+                               options = list(create = TRUE,
+                                              placeholder = 'Please select an option below',
+                                              onInitialize = I('function() { this.setValue(""); }'))),
+                selectizeInput("search_year",
+                               "Year",
+                               choices = as.character(c(1965:2015)),  
+                               options = list(create = TRUE,
+                                              placeholder = 'Please select an option below',
+                                              onInitialize = I('function() { this.setValue(""); }'))),
+                actionButton("searchDISPButton", "Search"),
+                tableOutput("current_DISP_search"),
+                downloadButton('downloadData_DISP', 'Download')
+                ),
+                
+                box(
+                  tags$h2("Download Data Used for Current Searched Combination"),
+                  downloadButton('download_reports', 'Download')
+                )
+                # box(plotOutput("drugplot"),
+                #     tags$br(),
+                #     tags$p("This plot includes top_10 most-reported drugs with most-reported indication assocaiated with the seached drug."), width = 4)
               )
       ),
       tabItem(tabName = "aboutinfo",
@@ -285,7 +323,7 @@ server <- function(input, output) {
   #  cv_reports_tab()[1:4,c("ACTIVE_INGREDIENT_NAME","DRUGNAME","DATINTRECEIVED_CLEAN","PT_NAME_ENG")]
   #})
   
-  observe({updateSelectizeInput(session, )})
+  #observe({updateSelectizeInput(session, )})
 
   #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   cv_search_tab <- reactive({
@@ -426,17 +464,114 @@ server <- function(input, output) {
     
     return(drugs_rxn_df)
   })
+  
+  cv_DISP_search <- reactive({
+    input$searchDISPButton
+    current_ingd <- isolate(ifelse(input$search_ingredient == "",
+                                   "acetaminophen",
+                                   input$search_ingredient))
+    current_year <- isolate(ifelse(input$search_year == "",
+                                   "2015",
+                                   input$search_year))
+    search_tab_df <- data.frame(names = c("Ingredient Name:",
+                                          "Year:"),
+                                terms = c(current_ingd,current_year),
+                                stringsAsFactors=FALSE)
+    return(search_tab_df)
+  })
+  
+  cv_download_DISP <- reactive({
+    input$downloadData_DISP
+    current_ingd <- isolate(ifelse(input$search_ingredient == "",
+                                   "acetaminophen",
+                                   input$search_ingredient))
+    current_year <- isolate(ifelse(input$search_year == "",
+                                  "2015",
+                                  input$search_year))
+    part1 <-cv_drug_product_ingredients %>% filter(ACTIVE_INGREDIENT_NAME == current_ingd) %>% 
+              select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
+              select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
+              inner_join(cv_reactions) %>% select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) %>% as.data.table(n=-1)
+    
+    part2 <- cv_reports %>% as.data.table(n=-1) %>% dplyr::mutate(year = format(floor_date(DATINTRECEIVED_CLEAN, "year"),"%Y")) %>% 
+              filter(year == current_year) %>%
+              select(REPORT_ID)
+    
+    DISP_final <- dplyr::summarise(group_by(inner_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) 
+    return(DISP_final)
+  })
+  
+  cv_download_reports <- reactive({
+    input$download_reports
+    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    current_brand <- isolate(ifelse(input$search_brand == "",
+                                    NA,
+                                    input$search_brand))
+    current_rxn <- isolate(ifelse(input$search_rxn == "",
+                                  NA,
+                                  input$search_rxn))
+    current_gender <- isolate(ifelse(input$search_gender == "",
+                                     "All",
+                                     input$search_gender))
+    current_date_range <- isolate(input$searchDateRange)
+    escape.POSIXt <- dplyr:::escape.Date
+    
+    cv_reports_sorted_dl <- if(current_gender != "All"){
+                              cv_reports %>%
+                                filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2], GENDER_ENG == current_gender)%>%collect()
+                            } else {
+                              cv_reports %>%
+                                filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])%>%collect()
+                            }
+    
+    cv_report_drug_dl <- if(is.na(current_brand) == FALSE){
+                            cv_report_drug %>%
+                              filter(DRUGNAME == current_brand)%>%collect()
+                          } else {
+                            cv_report_drug %>%collect()
+                          }
+    cv_reactions_dl <- if(is.na(current_rxn) == FALSE){
+                        cv_reactions %>%
+                          filter(PT_NAME_ENG == current_rxn)%>%collect()
+                      } else {
+                        cv_reactions%>%collect()
+                      }
+    cv_report_drug_indication_dl <- cv_report_drug_indication %>% collect()
+    
+    reports_tab_master <-  cv_reports_sorted_dl%>%
+                            left_join(cv_report_drug_dl, by="REPORT_ID") %>%
+                            left_join(cv_reactions_dl) %>%
+                            left_join(cv_report_drug_indication_dl)%>%
+                            as.data.table(n=-1)
+    return(reports_tab_master) 
+  })
 #########################################################################################################################################
 
-  ############# Download table for each tab #################
+  ############# Download Tab #################
   output$downloadData_RXN <- downloadHandler(
-    filename = function() { paste('RXNTab_outcome', '.csv', sep='') },
+    filename = function() { paste('RXN_outcome', '.csv', sep='') },
     content = function(file) {
       write.csv(cv_reactions_tab(), file)
     }
   )
   
+  output$current_DISP_search <-renderTable({
+    data<- cv_DISP_search()
+  }, include.rownames = FALSE, include.colnames = FALSE) 
   
+  output$downloadData_DISP <- downloadHandler(
+    filename = function() { paste('DISP_input', '.csv', sep='') },
+    content = function(file) {
+      write.csv(cv_download_DISP(), file)
+    }
+  )
+  
+  output$download_reports <- downloadHandler(
+    filename = function() { paste('reports', '.csv', sep='') },
+    content = function(file) {
+      write.csv(cv_download_reports(), file)
+    }
+  )
   
   ############## Construct Current_Query_Table for generic name, brand name, adverse reaction term & date range searched ############
   output$current_search <- renderTable({
