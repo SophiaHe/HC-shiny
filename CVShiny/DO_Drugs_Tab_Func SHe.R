@@ -4,7 +4,7 @@
 
 drugs_tab_indt <- function(current_brand, current_rxn,current_gender, current_date_range) { 
   # connect to CV database
-  hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+  # hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
 
   
   # Import tables with particular search items
