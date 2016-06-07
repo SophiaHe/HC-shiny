@@ -1,9 +1,9 @@
 # Tables used: CV_reports (REPORT_ID, DATINTRECEIVED_CLEAN)
 #              CV_Report_Drug (REPORT_ID, DRUGNAME)
 
-current_brand <- NA
-current_rxn <- NA
-current_date_range <- c(ymd("19650101", ymd("20160527")))
+# current_brand <- NA
+# current_rxn <- NA
+# current_date_range <- c(ymd("19650101", ymd("20160527")))
 
 reactions_tab <- function(current_brand,current_rxn,current_gender,current_date_range) { 
   # connect to CV database
