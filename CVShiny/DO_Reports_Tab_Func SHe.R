@@ -33,11 +33,11 @@ reports_tab <- function(current_brand,current_rxn,current_gender,current_date_ra
   #proc.time() - ptm
   cv_report_drug_rp <- if(is.na(current_brand) == FALSE){
                         cv_report_drug %>%
-                        select(REPORT_ID, DRUGNAME) %>%
+                        dplyr::select(REPORT_ID, DRUGNAME) %>%
                         filter(DRUGNAME == current_brand)
                       } else {
                         cv_report_drug %>%
-                        select(REPORT_ID, DRUGNAME)
+                          dplyr::select(REPORT_ID, DRUGNAME)
                       }
   cv_reactions_rp <- if(is.na(current_rxn) == FALSE){
                         cv_reactions %>%
@@ -50,7 +50,7 @@ reports_tab <- function(current_brand,current_rxn,current_gender,current_date_ra
  
   reports_tab_master <-  cv_reports_sorted_rp%>%
                           inner_join(cv_report_drug_rp) %>%
-                          semi_join(cv_reactions_rp) %>%
+                          inner_join(cv_reactions_rp) %>%
                           collect()
   return(reports_tab_master) 
 }
