@@ -20,11 +20,11 @@ drugs_tab_indt <- function(current_brand, current_rxn,current_gender, current_da
   
   cv_report_drug_drg <- if(is.na(current_brand) == FALSE){
                           cv_report_drug %>%
-                            select(REPORT_ID,DRUGNAME) %>%
+      dplyr::select(REPORT_ID,DRUGNAME) %>%
                             filter(DRUGNAME == current_brand)
                         } else {
                           cv_report_drug %>%
-                            select(REPORT_ID,DRUGNAME)
+                            dplyr::select(REPORT_ID,DRUGNAME)
                         }
 
   cv_reactions_drg <- if(is.na(current_rxn) == FALSE){
@@ -94,11 +94,11 @@ drugs_tab_topdrg <- function(current_brand,current_rxn,current_gender,current_da
   
   cv_report_drug_drg <- if(is.na(current_brand) == FALSE){
                           cv_report_drug %>%
-                            select(REPORT_ID,DRUGNAME) %>%
+      dplyr::select(REPORT_ID,DRUGNAME) %>%
                             filter(DRUGNAME != current_brand)
                         } else {
                           cv_report_drug %>%
-                            select(REPORT_ID,DRUGNAME)
+                            dplyr::select(REPORT_ID,DRUGNAME)
                         }
  
   drugs_tab_topdrg <- cv_reports_sorted_drg %>% 
