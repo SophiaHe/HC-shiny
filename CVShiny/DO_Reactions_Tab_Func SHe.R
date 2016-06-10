@@ -54,7 +54,7 @@ reactions_tab <- function(current_brand,current_rxn,current_gender,current_date_
 drugs_rxn <- function(current_brand,current_date_range){
   if(is.na(current_brand) == FALSE){
     cv_report_drug_rxn <- cv_report_drug %>%
-      select(REPORT_ID,DRUGNAME) %>%
+      dplyr::select(REPORT_ID,DRUGNAME) %>%
       filter(DRUGNAME == current_brand)
     
     cv_reactions_rxn <- cv_reactions %>% select(REPORT_ID, PT_NAME_ENG)
