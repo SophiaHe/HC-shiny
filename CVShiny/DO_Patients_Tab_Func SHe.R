@@ -22,11 +22,11 @@ patients_tab <- function( current_brand, current_rxn,current_gender,current_date
 
   cv_report_drug_pt <- if(is.na(current_brand) == FALSE){
                           cv_report_drug %>%
-                            select(REPORT_ID, DRUGNAME) %>%
+      dplyr::select(REPORT_ID, DRUGNAME) %>%
                             filter(DRUGNAME == current_brand)
                         } else {
                           cv_report_drug %>%
-                            select(REPORT_ID, DRUGNAME)
+                            dplyr::select(REPORT_ID, DRUGNAME)
                         }
   # cv_report_drug_pt <- cv_report_drug_pt[order(cv_report_drug_pt$DRUG_PRODUCT_ID),]  
   
