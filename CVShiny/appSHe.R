@@ -1,6 +1,7 @@
 library(shinydashboard)
 library(jsonlite)
 library(lubridate)
+library(plyr)
 library(dplyr)
 library(data.table)
 library(ggplot2)
@@ -11,8 +12,7 @@ library(DT)
 library(googleVis)
 # library(openfda)
 library(stringr)
-library(plyr)
-library(data.table)
+library(PhViD)
 
 
 ########## Codes to fetch top 1000 specific results to be used in dropdown menu ###############
@@ -39,19 +39,19 @@ cv_report_drug_indication <- tbl(hcopen,"cv_report_drug_indication")
 
 adrplot <- function(adrplot_test, plottitle){
   adrplot_test <- adrplot_test %>% 
-    select(REPORT_ID,DATINTRECEIVED_CLEAN) %>%
-    mutate( plot_date = floor_date(ymd(adrplot_test$DATINTRECEIVED_CLEAN), "month")) %>%
-    select(REPORT_ID,plot_date)
+    dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) %>%
+    mutate(plot_date = floor_date(ymd(adrplot_test$DATINTRECEIVED_CLEAN), "month")) %>%
+    dplyr::select(REPORT_ID,plot_date)
   
-  nreports <- ddply(adrplot_test,"plot_date",count_func)
-  total_reports <- sum(nreports$n)
+  nreports <- dplyr::summarise(group_by(adrplot_test,plot_date),count=n_distinct(REPORT_ID))
+  total_reports <- sum(nreports$count)
   
   
   plottitle1 <- paste(plottitle, " (", total_reports, " reports)") 
   
   
   plot <- nreports %>%
-    ggplot(aes(x = plot_date, y = n)) +
+    ggplot(aes(x = plot_date, y = count)) +
     geom_line(stat = "identity", size = 0.1) +
     stat_smooth(method = "loess", size = 0.1) +
     ggtitle(plottitle1) + 
@@ -60,34 +60,34 @@ adrplot <- function(adrplot_test, plottitle){
     theme_bw() +
     theme(plot.title = element_text(lineheight=.8, face="bold"))
   
-  # ggplotly(p= plot)
+   #ggplotly(p= plot)
 }
 
 ############## Function to create top 100 terms included in the dropdown menu #############
 topingd_func <- function(n){
-  cv_drug_product_ingredients_dm <- cv_drug_product_ingredients %>% select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME)
-  cv_report_drug_dm <- cv_report_drug %>% select(DRUG_PRODUCT_ID,REPORT_ID)
+  cv_drug_product_ingredients_dm <- cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME)
+  cv_report_drug_dm <- cv_report_drug %>% dplyr::select(DRUG_PRODUCT_ID,REPORT_ID)
   
   topingd <-  dplyr::summarise(group_by(inner_join(cv_report_drug_dm,cv_drug_product_ingredients_dm),ACTIVE_INGREDIENT_NAME),count=n_distinct(REPORT_ID))%>%
     as.data.table(n=-1)
-  topingd_final <-  topingd %>% dplyr::arrange(desc(count)) %>% top_n(n) %>% select(ACTIVE_INGREDIENT_NAME)
+  topingd_final <-  topingd %>% dplyr::arrange(desc(count)) %>% top_n(n) %>% dplyr::select(ACTIVE_INGREDIENT_NAME)
   return(topingd_final)
 }
 
 topdrug_func <- function(n){
-  cv_report_drug_dm <- cv_report_drug %>% select(REPORT_ID, DRUGNAME)
+  cv_report_drug_dm <- cv_report_drug %>% dplyr::select(REPORT_ID, DRUGNAME)
   
   topdrugs <- dplyr::summarise(group_by(cv_report_drug_dm, DRUGNAME),count=n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
-  topdrugs_final <- topdrugs %>% arrange(desc(count)) %>% top_n(n) %>% select(DRUGNAME)
+  topdrugs_final <- topdrugs %>% arrange(desc(count)) %>% top_n(n) %>% dplyr::select(DRUGNAME)
   
   return(topdrugs_final)
 } 
 
 toprxn_func <- function(n){
-  cv_reactions_dm <- cv_reactions %>% select(REPORT_ID, PT_NAME_ENG)
+  cv_reactions_dm <- cv_reactions %>% dplyr::select(REPORT_ID, PT_NAME_ENG)
   
   toprxn <- dplyr::summarise(group_by(cv_reactions_dm, PT_NAME_ENG),count=n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
-  toprxn_final <- toprxn %>% arrange(desc(count)) %>% top_n(n) %>% select(PT_NAME_ENG)
+  toprxn_final <- toprxn %>% dplyr::arrange(desc(count)) %>% top_n(n) %>% dplyr::select(PT_NAME_ENG)
   
   return(toprxn_final)
 }
@@ -96,36 +96,36 @@ toprxn_func <- function(n){
 reports_tab <- function(current_brand,current_rxn,current_gender,current_date_range) { 
   cv_reports_sorted_rp <- if(current_gender != "All"){
     cv_reports %>%
-      select(REPORT_ID, SERIOUSNESS_ENG, REPORTER_TYPE_ENG, DEATH, DISABILITY, CONGENITAL_ANOMALY,LIFE_THREATENING, HOSP_REQUIRED, 
-             OTHER_MEDICALLY_IMP_COND, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
+      dplyr::select(REPORT_ID, SERIOUSNESS_ENG, REPORTER_TYPE_ENG, DEATH, DISABILITY, CONGENITAL_ANOMALY,LIFE_THREATENING, HOSP_REQUIRED, 
+                    OTHER_MEDICALLY_IMP_COND, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2], GENDER_ENG == current_gender)
   } else {
     cv_reports %>%
-      select(REPORT_ID, SERIOUSNESS_ENG, REPORTER_TYPE_ENG, DEATH, DISABILITY, CONGENITAL_ANOMALY,LIFE_THREATENING, HOSP_REQUIRED, 
-             OTHER_MEDICALLY_IMP_COND, DATINTRECEIVED_CLEAN,GENDER_ENG) %>%
+      dplyr::select(REPORT_ID, SERIOUSNESS_ENG, REPORTER_TYPE_ENG, DEATH, DISABILITY, CONGENITAL_ANOMALY,LIFE_THREATENING, HOSP_REQUIRED, 
+                    OTHER_MEDICALLY_IMP_COND, DATINTRECEIVED_CLEAN,GENDER_ENG) %>%
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
   }
-
+  
   cv_report_drug_rp <- if(is.na(current_brand) == FALSE){
     cv_report_drug %>%
-      select(REPORT_ID, DRUGNAME) %>%
+      dplyr::select(REPORT_ID, DRUGNAME) %>%
       filter(DRUGNAME == current_brand)
   } else {
     cv_report_drug %>%
-      select(REPORT_ID, DRUGNAME)
+      dplyr::select(REPORT_ID, DRUGNAME)
   }
   cv_reactions_rp <- if(is.na(current_rxn) == FALSE){
     cv_reactions %>%
-      select(REPORT_ID, PT_NAME_ENG) %>%
+      dplyr::select(REPORT_ID, PT_NAME_ENG) %>%
       filter(PT_NAME_ENG == current_rxn)
   } else {
     cv_reactions %>%
-      select(REPORT_ID, PT_NAME_ENG)
+      dplyr::select(REPORT_ID, PT_NAME_ENG)
   }
   
   reports_tab_master <-  cv_reports_sorted_rp%>%
     inner_join(cv_report_drug_rp) %>%
-    semi_join(cv_reactions_rp) %>%
+    inner_join(cv_reactions_rp) %>%
     collect()
   return(reports_tab_master) 
 }
@@ -136,31 +136,30 @@ patients_tab <- function( current_brand, current_rxn,current_gender,current_date
   # Import tables with particular search items with method to deal with unspecified search term
   cv_reports_sorted_pt <- if(current_gender != "All"){
     cv_reports %>%
-      select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG, AGE_Y,AGE_GROUP_CLEAN) %>%
+      dplyr::select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG, AGE_Y,AGE_GROUP_CLEAN) %>%
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2], GENDER_ENG == current_gender)
   } else {
     cv_reports %>%
-      select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG, AGE_Y,AGE_GROUP_CLEAN) %>%
+      dplyr::select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG, AGE_Y,AGE_GROUP_CLEAN) %>%
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])  
   }
   
   cv_report_drug_pt <- if(is.na(current_brand) == FALSE){
     cv_report_drug %>%
-      select(REPORT_ID, DRUGNAME) %>%
+      dplyr::select(REPORT_ID, DRUGNAME) %>%
       filter(DRUGNAME == current_brand)
   } else {
     cv_report_drug %>%
-      select(REPORT_ID, DRUGNAME)
+      dplyr::select(REPORT_ID, DRUGNAME)
   }
-  # cv_report_drug_pt <- cv_report_drug_pt[order(cv_report_drug_pt$DRUG_PRODUCT_ID),]  
   
   cv_reactions_pt <-if(is.na(current_rxn) == FALSE){
     cv_reactions %>%
-      select(REPORT_ID, PT_NAME_ENG) %>%
+      dplyr::select(REPORT_ID, PT_NAME_ENG) %>%
       filter(PT_NAME_ENG == current_rxn)
   } else {
     cv_reactions %>%
-      select(REPORT_ID, PT_NAME_ENG)
+      dplyr::select(REPORT_ID, PT_NAME_ENG)
   }
   patients_tab_master <-cv_reports_sorted_pt%>%
     semi_join(cv_report_drug_pt) %>%
@@ -173,41 +172,36 @@ patients_tab <- function( current_brand, current_rxn,current_gender,current_date
 
 ################################## Function for Drug tab ################################## 
 drugs_tab_indt <- function(current_brand, current_rxn,current_gender, current_date_range) { 
-  # connect to CV database
-  # hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
-  
-  
   # Import tables with particular search items
   cv_reports_sorted_drg <- if(current_gender != "All"){
     cv_reports %>%
-      select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
+      dplyr::select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2], GENDER_ENG == current_gender) 
   } else {
     cv_reports %>%
-      select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
+      dplyr::select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
   }
   
   cv_report_drug_drg <- if(is.na(current_brand) == FALSE){
     cv_report_drug %>%
-      select(REPORT_ID,DRUGNAME) %>%
+      dplyr::select(REPORT_ID,DRUGNAME) %>%
       filter(DRUGNAME == current_brand)
   } else {
     cv_report_drug %>%
-      select(REPORT_ID,DRUGNAME)
+      dplyr::select(REPORT_ID,DRUGNAME)
   }
   
   cv_reactions_drg <- if(is.na(current_rxn) == FALSE){
     cv_reactions %>%
-      select(REPORT_ID, PT_NAME_ENG) %>%
+      dplyr::select(REPORT_ID, PT_NAME_ENG) %>%
       filter(PT_NAME_ENG == current_rxn)
   } else {
     cv_reactions %>%
-      select(REPORT_ID, PT_NAME_ENG)
+      dplyr::select(REPORT_ID, PT_NAME_ENG)
   }
   
-  cv_report_drug_indication_drg <- cv_report_drug_indication %>%
-    select(REPORT_ID, INDICATION_NAME_ENG)
+  cv_report_drug_indication_drg <- cv_report_drug_indication %>% dplyr::select(REPORT_ID, INDICATION_NAME_ENG)
   
   # Data frame used to obtain Top_25_indication bar chart: Indication is only associated with individual drug
   # When brand name is unspecified, chart shows top 25 indications associated with DRUGNAME="REMICADE" + date_range
@@ -228,43 +222,41 @@ drugs_tab_indt <- function(current_brand, current_rxn,current_gender, current_da
 drugs_tab_topdrg <- function(current_brand,current_rxn,current_gender,current_date_range) { 
   # connect to CV database
   hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
-  
-  setwd("~/CVShiny")
-  source("DO_Drugs_Tab_Func SHe.R")
+
   df <- drugs_tab_indt(current_brand = current_brand, current_rxn = current_rxn, current_gender =current_gender, current_date_range=current_date_range)
   
   indications <-  dplyr::summarise(group_by(df, INDICATION_NAME_ENG),count=n_distinct(REPORT_ID))
-  top_indications<- indications %>% arrange(desc(count)) %>% top_n(n=1) %>% select(INDICATION_NAME_ENG)
+  top_indications<- indications %>% arrange(desc(count)) %>% top_n(n=1) %>% dplyr::select(INDICATION_NAME_ENG)
   top_indications_final <- top_indications$INDICATION_NAME_ENG
   
   
   # indication import
   cv_report_drug_indication_drg <- cv_report_drug_indication %>%
-    select(REPORT_ID, INDICATION_NAME_ENG, DRUGNAME) %>%
+    dplyr::select(REPORT_ID, INDICATION_NAME_ENG, DRUGNAME) %>%
     filter(INDICATION_NAME_ENG == top_indications_final)
   cv_reports_sorted_drg <- if(current_gender != "All"){
     cv_reports %>%
-      select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
+      dplyr::select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2], GENDER_ENG == current_gender)
   } else{
     cv_reports %>%
-      select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
+      dplyr::select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
   }
   
   cv_report_drug_drg <- if(is.na(current_brand) == FALSE){
     cv_report_drug %>%
-      select(REPORT_ID,DRUGNAME) %>%
+      dplyr::select(REPORT_ID,DRUGNAME) %>%
       filter(DRUGNAME != current_brand)
   } else {
     cv_report_drug %>%
-      select(REPORT_ID,DRUGNAME)
+      dplyr::select(REPORT_ID,DRUGNAME)
   }
   
   drugs_tab_topdrg <- cv_reports_sorted_drg %>% 
     inner_join(cv_report_drug_drg)%>%
     semi_join(cv_report_drug_indication_drg) %>%
-    select(REPORT_ID, DRUGNAME, GENDER_ENG) %>%
+    dplyr::select(REPORT_ID, DRUGNAME, GENDER_ENG) %>%
     collect()
   
   return(drugs_tab_topdrg)
@@ -272,33 +264,36 @@ drugs_tab_topdrg <- function(current_brand,current_rxn,current_gender,current_da
 
 ################################## Function for Reactions tab ################################## 
 reactions_tab <- function(current_brand,current_rxn,current_gender,current_date_range) { 
+  # connect to CV database
+  # hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+  
   # Import tables with particular search items with method to deal with unspecified search term
   cv_reports_sorted_rxn <- if(current_gender != "All"){
     cv_reports %>%
-      select(REPORT_ID, DATINTRECEIVED_CLEAN, OUTCOME_ENG,GENDER_ENG) %>%
+      dplyr::select(REPORT_ID, DATINTRECEIVED_CLEAN, OUTCOME_ENG,GENDER_ENG) %>%
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
       filter(GENDER_ENG == current_gender)
   } else {
     cv_reports %>%
-      select(REPORT_ID, DATINTRECEIVED_CLEAN, OUTCOME_ENG,GENDER_ENG) %>%
+      dplyr::select(REPORT_ID, DATINTRECEIVED_CLEAN, OUTCOME_ENG,GENDER_ENG) %>%
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])  
   } 
   
   cv_report_drug_rxn <- if(is.na(current_brand) == FALSE){
     cv_report_drug %>%
-      select(REPORT_ID,DRUG_PRODUCT_ID,DRUGNAME) %>%
+      dplyr::select(REPORT_ID,DRUG_PRODUCT_ID,DRUGNAME) %>%
       filter(DRUGNAME == current_brand)
   } else {
     cv_report_drug %>%
-      select(REPORT_ID,DRUG_PRODUCT_ID,DRUGNAME)
+      dplyr::select(REPORT_ID,DRUG_PRODUCT_ID,DRUGNAME)
   }
   cv_reactions_rxn <- if(is.na(current_rxn) == FALSE){
     cv_reactions %>%
-      select(REPORT_ID, PT_NAME_ENG) %>%
+      dplyr::select(REPORT_ID, PT_NAME_ENG) %>%
       filter(PT_NAME_ENG == current_rxn)
   } else {
     cv_reactions %>%
-      select(REPORT_ID, PT_NAME_ENG)
+      dplyr::select(REPORT_ID, PT_NAME_ENG)
   }
   
   # When generic, brand & reaction names are unspecified, count number of UNIQUE reports associated with each OUTCOME_ENG 
@@ -306,7 +301,7 @@ reactions_tab <- function(current_brand,current_rxn,current_gender,current_date_
   reactions_tab_master <- cv_reports_sorted_rxn %>%
     semi_join(cv_report_drug_rxn) %>%
     semi_join(cv_reactions_rxn) %>%
-    select(REPORT_ID, OUTCOME_ENG) %>%
+    dplyr::select(REPORT_ID, OUTCOME_ENG) %>%
     collect()
   
   return(reactions_tab_master)
@@ -317,10 +312,10 @@ reactions_tab <- function(current_brand,current_rxn,current_gender,current_date_
 drugs_rxn <- function(current_brand,current_date_range){
   if(is.na(current_brand) == FALSE){
     cv_report_drug_rxn <- cv_report_drug %>%
-      select(REPORT_ID,DRUGNAME) %>%
+      dplyr::select(REPORT_ID,DRUGNAME) %>%
       filter(DRUGNAME == current_brand)
     
-    cv_reactions_rxn <- cv_reactions %>% select(REPORT_ID, PT_NAME_ENG)
+    cv_reactions_rxn <- cv_reactions %>% dplyr::select(REPORT_ID, PT_NAME_ENG)
     
     drugs_rxn_df <- cv_reactions_rxn %>% inner_join(cv_report_drug_rxn) %>% collect()
     drugs_rxn_result <- dplyr::summarise(group_by(drugs_rxn_df, DRUGNAME,PT_NAME_ENG),count=n_distinct(REPORT_ID))%>% 
@@ -328,10 +323,10 @@ drugs_rxn <- function(current_brand,current_date_range){
       top_n(10) %>%
       collect()
   } else {
-    cv_reactions_rxn  <- cv_reactions %>% select(REPORT_ID, PT_NAME_ENG)
+    cv_reactions_rxn  <- cv_reactions %>% dplyr::select(REPORT_ID, PT_NAME_ENG)
     
     toprxn <- dplyr::summarise(group_by(cv_reactions_rxn, PT_NAME_ENG),count=n_distinct(REPORT_ID))
-    drugs_rxn_result <- toprxn %>% dplyr::arrange(desc(count)) %>% top_n(10) %>% select(PT_NAME_ENG, count) %>% collect()
+    drugs_rxn_result <- toprxn %>% dplyr::arrange(desc(count)) %>% top_n(10) %>% dplyr::select(PT_NAME_ENG, count) %>% collect()
   }
   
   return(drugs_rxn_result)
@@ -358,6 +353,7 @@ ui <- dashboardPage(
       menuItem("Drugs", tabName = "drugdata", icon = icon("flask")),
       menuItem("Patients", tabName = "patientdata", icon = icon("user-md")),
       menuItem("Reactions", tabName = "rxndata", icon = icon("heart-o")),
+      menuItem("Signal Detection", tabName = "DISPdata", icon = icon("fa fa-binoculars")),
       menuItem("Download", tabName = "downloaddata", icon = icon("fa fa-download")),
       menuItem("About", tabName = "aboutinfo", icon = icon("info"))
     ),
@@ -393,7 +389,16 @@ ui <- dashboardPage(
     actionButton("searchButton", "Search"),
     tags$br(),
     tags$h3(strong("Current Search:")),
-    tableOutput("current_search")
+    tableOutput("current_search"),
+    tags$h3(strong("Disproportionality Analysis: ")),
+    dateRangeInput("searchDateRange_DISP_ANALYSIS",
+                   "Date Range for Disproportionality Analysis",
+                   start = "1965-01-01",
+                   end = "1965-03-31",
+                   max = Sys.Date(),
+                   startview = "year",
+                   format = "yyyy-mm-dd"),
+    actionButton("DISPButton", "Go")
   ), 
   
   dashboardBody(
@@ -450,10 +455,23 @@ ui <- dashboardPage(
       tabItem(tabName = "rxndata",
               fluidRow(
                 box(htmlOutput("outcomeplot"), title = tags$h2("Outcomes (all reactions)")),
-                box(htmlOutput("rxnTbl"), title = tags$h2("Top10 Reactions Associated with Searched Drug")),
+                box(htmlOutput("rxnTbl"), title = tags$h2("Top10 Reactions Associated with Searched Drug"))
+                # box(
+                #   tags$h2("Download Data Used for Current Tab"),
+                #   downloadButton('downloadData_RXN', 'Download')
+                # )
+              )
+      ),
+      
+      tabItem(tabName = "DISPdata",
+              fluidRow(
                 box(
-                  tags$h2("Download Data Used for Current Tab"),
-                  downloadButton('downloadData_RXN', 'Download')
+                  htmlOutput("signalplot_BCPNN"), title = tags$h2("Top 10 Signals Detected By BCPNN Method"),width=4.5,
+                  tags$p("BCPNN method detects signals based on Information Component (IC) which evaluate the association between each Drug*AR pair. Those ICs are then sorted based on strength of the signals. Details about this method are explained in the About Tab.")
+                ),
+                box(
+                  htmlOutput("signalplot_PRR"), title = tags$h2("Top 10 Signals Detected By PRR Method"),width=4.5,
+                  tags$p("PRR method detects signals based on Proportional Reporting Ratio (PRR) which detects more-frequently-reported Drug*AR pairs. Those PRR are then sorted based on their respective strengths. Details about this method are explained in the About Tab.")
                 )
               )
       ),
@@ -465,23 +483,21 @@ ui <- dashboardPage(
                 #     tags$p("This plot includes top_10 indications for drugs associated with the matching reports."), width = 4),
                 box(
                   title = tags$h2("Download Dataset for Disproportionality Analysis"),
-                  selectizeInput("search_ingredient",
-                                 "Active Ingredient",
-                                 topingd$ACTIVE_INGREDIENT_NAME, 
-                                 options = list(create = TRUE,
-                                                placeholder = 'Please select an option below',
-                                                onInitialize = I('function() { this.setValue(""); }'))),
-                  selectizeInput("search_year",
-                                 "Year",
-                                 choices = as.character(c(1965:2015)),  
-                                 options = list(create = TRUE,
-                                                placeholder = 'Please select an option below',
-                                                onInitialize = I('function() { this.setValue(""); }'))),
+                  dateRangeInput("searchDateRange_DISP",
+                                 "Date Range",
+                                 start = "1965-01-01",
+                                 end = Sys.Date(),
+                                 startview = "year",
+                                 format = "yyyy-mm-dd"),
                   actionButton("searchDISPButton", "Search"),
                   tableOutput("current_DISP_search"),
                   downloadButton('downloadData_DISP', 'Download')
-                )
+                ),
                 
+                box(
+                  tags$h2("Download Data Used for Current Searched Combination"),
+                  downloadButton('download_reports', 'Download')
+                )
                 # box(plotOutput("drugplot"),
                 #     tags$br(),
                 #     tags$p("This plot includes top_10 most-reported drugs with most-reported indication assocaiated with the seached drug."), width = 4)
@@ -507,13 +523,20 @@ ui <- dashboardPage(
                   tags$p("Jr. Data Scientist Co-op, Health Products and Food Branch"),
                   tags$p("Health Canada / Government of Canada"),
                   tags$p("sophia.he@canada.ca")
+                ),
+                box(
+                  tags$h3("Disproportionality Analysis - Bayesian confidence propagation neural network (BCPNN) Method"),
+                  tags$p("..."),
+                  tags$br(),
+                  tags$h3("Disproportionality Analysis - Proportional Reporting Ratio (PRR) Method"),
+                  tags$p("...")
                 )
               )
       )
     )
     ), 
   skin = "blue"
-    )
+)
 
 
 ############## Server of shiny ########################
@@ -529,7 +552,7 @@ server <- function(input, output) {
   # Data frame generate reactive function to be used to assign: data <- cv_reports_tab()
   cv_reports_tab <- reactive({
     input$searchButton
-    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    #codes about dplyr::select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_brand <- isolate(ifelse(input$search_brand == "",
                                     NA,
                                     input$search_brand))
@@ -541,21 +564,23 @@ server <- function(input, output) {
                                      input$search_gender))
     current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
-
+    
     reports_tab_df <- reports_tab(current_brand=current_brand,current_rxn=current_rxn,current_gender =current_gender,current_date_range=current_date_range)
     
     return(reports_tab_df)
   })
-
+  
   # sample datasets of what is being graphed/used
   #output$outputReports <- renderTable({
   #  cv_reports_tab()[1:4,c("ACTIVE_INGREDIENT_NAME","DRUGNAME","DATINTRECEIVED_CLEAN","PT_NAME_ENG")]
   #})
-
+  
+  #observe({updatedplyr::selectizeInput(session, )})
+  
   #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   cv_search_tab <- reactive({
     input$searchButton
-    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    #codes about dplyr::select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_brand <- isolate(ifelse(input$search_brand == "",
                                     NA,
                                     input$search_brand))
@@ -578,11 +603,11 @@ server <- function(input, output) {
     search_tab_df$terms[is.na(search_tab_df$terms) == TRUE] <- "Not Specified (All)"
     return(search_tab_df)
   })
-
+  
   #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   cv_patients_tab <- reactive({
     input$searchButton
-    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    #codes about dplyr::select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_brand <- isolate(ifelse(input$search_brand == "",
                                     NA,
                                     input$search_brand))
@@ -594,7 +619,7 @@ server <- function(input, output) {
                                      input$search_gender))
     current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
-    
+
     patients_tab_df <- patients_tab(current_brand=current_brand,current_rxn=current_rxn,current_gender =current_gender,current_date_range=current_date_range)
     
     return(patients_tab_df)
@@ -603,7 +628,7 @@ server <- function(input, output) {
   #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   cv_drug_tab_topdrg <- reactive({
     input$searchButton
-    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    #codes about dplyr::select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_brand <- isolate(ifelse(input$search_brand == "",
                                     NA,
                                     input$search_brand))
@@ -615,16 +640,16 @@ server <- function(input, output) {
                                      input$search_gender))
     current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
-
+  
     drugs_tab_topdrg_df <- drugs_tab_topdrg(current_brand=current_brand,current_rxn=current_rxn,current_gender =current_gender,current_date_range=current_date_range)
     
     return(drugs_tab_topdrg_df)
   })
-
+  
   #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   cv_drug_tab_indc <- reactive({
     input$searchButton
-    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    #codes about dplyr::select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_brand <- isolate(ifelse(input$search_brand == "",
                                     NA,
                                     input$search_brand))
@@ -636,16 +661,16 @@ server <- function(input, output) {
                                      input$search_gender))
     current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
- 
+   
     drugs_tab_indt_df <- drugs_tab_indt(current_brand=current_brand,current_rxn=current_rxn,current_gender =current_gender,current_date_range=current_date_range)
     
     return(drugs_tab_indt_df)
   })
-
+  
   #hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
   cv_reactions_tab <- reactive({
     input$searchButton
-    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    #codes about dplyr::select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_brand <- isolate(ifelse(input$search_brand == "",
                                     NA,
                                     input$search_brand))
@@ -665,13 +690,13 @@ server <- function(input, output) {
   
   cv_reactions_tbl <- reactive({
     input$searchButton
-    #codes about select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    #codes about dplyr::select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_brand <- isolate(ifelse(input$search_brand == "",
                                     NA,
                                     input$search_brand))
     current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
-
+    
     drugs_rxn_df <- drugs_rxn(current_brand=current_brand,current_date_range=current_date_range)
     
     return(drugs_rxn_df)
@@ -679,49 +704,134 @@ server <- function(input, output) {
   
   cv_DISP_search <- reactive({
     input$searchDISPButton
-    current_ingd <- isolate(ifelse(input$search_ingredient == "",
-                                   "acetaminophen",
-                                   input$search_ingredient))
-    current_year <- isolate(ifelse(input$search_year == "",
-                                   "2015",
-                                   input$search_year))
-    search_tab_df <- data.frame(names = c("Ingredient Name:",
-                                          "Year:"),
-                                terms = c(current_ingd,current_year),
+    current_date_range <- isolate(input$searchDateRange_DISP)
+    escape.POSIXt <- dplyr:::escape.Date
+    
+    search_tab_df <- data.frame(names = c("Date Range"),
+                                terms = paste(current_date_range[1]," to ", current_date_range[2]),
                                 stringsAsFactors=FALSE)
     return(search_tab_df)
   })
   
   cv_download_DISP <- reactive({
     input$downloadData_DISP
-    current_ingd <- isolate(ifelse(input$search_ingredient == "",
-                                   "acetaminophen",
-                                   input$search_ingredient))
-    current_year <- isolate(ifelse(input$search_year == "",
-                                   "2015",
-                                   input$search_year))
-    part1 <-cv_drug_product_ingredients %>% filter(ACTIVE_INGREDIENT_NAME == current_ingd) %>% 
-      select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
-      select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
-      inner_join(cv_reactions) %>% select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) %>% as.data.table(n=-1)
+    current_date_range <- isolate(input$searchDateRange_DISP)
+    escape.POSIXt <- dplyr:::escape.Date
     
-    part2 <- cv_reports %>% as.data.table(n=-1) %>% dplyr::mutate(year = format(floor_date(DATINTRECEIVED_CLEAN, "year"),"%Y")) %>% 
-      filter(year == current_year) %>%
-      select(REPORT_ID)
+    part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
+      dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
+      inner_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
     
-    DISP_final <- dplyr::summarise(group_by(inner_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) 
+    part2 <- cv_reports  %>% 
+      filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
+      dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
+    
+    DISP_final <- dplyr::summarise(group_by(inner_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% collect()
+    
     return(DISP_final)
+  })
+  
+  
+  ########## Download searched dataset ############# 
+  cv_download_reports <- reactive({
+    input$searchButton
+    #codes about dplyr::select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    current_brand <- isolate(ifelse(input$search_brand == "",
+                                    NA,
+                                    input$search_brand))
+    current_rxn <- isolate(ifelse(input$search_rxn == "",
+                                  NA,
+                                  input$search_rxn))
+    current_gender <- isolate(ifelse(input$search_gender == "",
+                                     "All",
+                                     input$search_gender))
+    current_date_range <- isolate(input$searchDateRange)
+    escape.POSIXt <- dplyr:::escape.Date
+    
+    input$download_reports
+    cv_reports_sorted_dl <- if(current_gender != "All"){
+      cv_reports %>%
+        filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2], GENDER_ENG == current_gender)
+    } else {
+      cv_reports %>%
+        filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
+    }
+    
+    cv_report_drug_dl <- if(is.na(current_brand) == FALSE){
+      cv_report_drug %>%
+        filter(DRUGNAME == current_brand)
+    } else {
+      cv_report_drug 
+    }
+    cv_reactions_dl <- if(is.na(current_rxn) == FALSE){
+      cv_reactions %>%
+        filter(PT_NAME_ENG == current_rxn)
+    } else {
+      cv_reactions
+    }
+    #cv_report_drug_indication_dl <- cv_report_drug_indication 
+    
+    reports_tab_master <-  cv_reports_sorted_dl%>%
+      inner_join(cv_report_drug_dl) %>%
+      inner_join(cv_reactions_dl)%>%
+      collect()
+    return(reports_tab_master) 
+  })
+  
+  
+  ############################## DISP tab ##############################
+  cv_disp_BCPNN <- reactive({
+    input$DISPButton
+    current_date_range <- isolate(input$searchDateRange_DISP_ANALYSIS)
+    #current_date_range <- c(ymd("20000401", ymd("20000630")))
+    escape.POSIXt <- dplyr:::escape.Date
+    
+    part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
+      dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
+      inner_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
+    
+    part2 <- cv_reports  %>% 
+      filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
+      dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
+    
+    DISP_final <- dplyr::summarise(group_by(inner_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
+    
+    
+    bayes_table <- as.PhViD(DISP_final, MARGIN.THRES = 1) 
+    bayes_result <- BCPNN(bayes_table, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
+    
+    signals <- as.data.table(bayes_result$SIGNAL) 
+    signals_final <- signals %>% mutate(D_AR_Comb = paste(signals$`drug code`, " * ", signals$`event effect`))
+    return(signals_final)
+  })
+  
+  cv_disp_PRR <- reactive({
+    input$DISPButton
+    current_date_range <- isolate(input$searchDateRange_DISP_ANALYSIS)
+    escape.POSIXt <- dplyr:::escape.Date
+    
+    part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
+      dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
+      inner_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
+    
+    part2 <- cv_reports  %>% 
+      filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
+      dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
+    
+    DISP_final <- dplyr::summarise(group_by(inner_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
+    
+    
+    bayes_table_PRR <- as.PhViD(DISP_final, MARGIN.THRES = 1) 
+    
+    PRR_results <- PRR(bayes_table_PRR, RR0=1, MIN.n11 = 1, DECISION = 3, DECISION.THRES = 0.05, RANKSTAT = 2)
+    
+    signals <-  PRR_results$SIGNAL %>% collect()
+    signals_final <- signals %>% mutate(D_AR_Comb = paste(signals$`drug code`, " * ", signals$`event effect`)) %>% arrange(desc(`LB95(log(PRR))`)) %>% top_n(10,wt=`LB95(log(PRR))`)
+    return(signals_final)
   })
 #########################################################################################################################################
   
   ############# Download table for each tab #################
-  output$downloadData_RXN <- downloadHandler(
-    filename = function() { paste('RXN_outcome', '.csv', sep='') },
-    content = function(file) {
-      write.csv(cv_reactions_tab(), file)
-    }
-  )
-  
   output$current_DISP_search <-renderTable({
     data<- cv_DISP_search()
   }, include.rownames = FALSE, include.colnames = FALSE) 
@@ -729,7 +839,16 @@ server <- function(input, output) {
   output$downloadData_DISP <- downloadHandler(
     filename = function() { paste('DISP_input', '.csv', sep='') },
     content = function(file) {
-      write.csv(cv_download_DISP(), file)
+      data <- cv_download_DISP()
+      write.csv(data, file)
+    }
+  )
+  
+  output$download_reports <- downloadHandler(
+    filename = function() { paste('reports', '.csv', sep='') },
+    content = function(file) {
+      data <- cv_download_reports()
+      write.csv(data, file)
     }
   )
   
@@ -744,7 +863,7 @@ server <- function(input, output) {
   output$timeplot <- renderPlotly({
     
     data <- cv_reports_tab()
-    
+    #data <-reports_tab(current_brand=current_brand,current_rxn=current_rxn,current_gender =current_gender,current_date_range=current_date_range)
     #drug_selected <- data$DRUGNAME[1] 
     
     data1 <- cv_search_tab()
@@ -753,9 +872,10 @@ server <- function(input, output) {
     
     # specify the title of time plot based on reactive choice
     title <- ifelse(drug_selected == "Not Specified (All)", "All Drugs",drug_selected)
+    #title <- "xxx"
     plottitle <- paste("Drug Adverse Event Reports for", title)
     p <- adrplot(adrplot_test = data, plottitle = plottitle)
-    print(p)
+    #print(p)
     ggplotly(p)
   })
   
@@ -765,7 +885,7 @@ server <- function(input, output) {
     # test
     # data <- reports_tab(current_generic="ampicillin",current_brand="PENBRITIN",current_rxn="Urticaria",date_ini=ymd("19650101"),date_end=ymd("20151231"))
     
-    reporter_df <- data %>% select(REPORT_ID, REPORTER_TYPE_ENG)
+    reporter_df <- data %>% dplyr::select(REPORT_ID, REPORTER_TYPE_ENG)
     
     # Use ddply & count_func to count number of unique report for each REPORTER_TYPE_ENG
     reporter_results<-dplyr::summarise(group_by(reporter_df, REPORTER_TYPE_ENG),count=n_distinct(REPORT_ID))
@@ -787,7 +907,7 @@ server <- function(input, output) {
     data <- cv_reports_tab()
     
     serious_df <-  data%>%
-      select(REPORT_ID,SERIOUSNESS_ENG)
+      dplyr::select(REPORT_ID,SERIOUSNESS_ENG)
     
     serious_results <- dplyr::summarise(group_by(serious_df, SERIOUSNESS_ENG),count=n_distinct(REPORT_ID))
     serious_results$SERIOUSNESS_ENG[serious_results$SERIOUSNESS_ENG == ""] <- "Not Specified"
@@ -822,7 +942,7 @@ server <- function(input, output) {
       congenital_results_final <- filter(congenital_results,SERIOUSNESS_ENG == "Yes", CONGENITAL_ANOMALY == 1)%>%
         mutate(Reasons = "CONGENITAL ANOMALY")%>%
         ungroup() %>%
-        select(Reasons,count)
+        dplyr::select(Reasons,count)
     } else {
       Reasons <- I("CONGENITAL ANOMALY")
       count <- c(0)
@@ -837,7 +957,7 @@ server <- function(input, output) {
       death_results_final <- filter(death_results,SERIOUSNESS_ENG == "Yes", DEATH == 1)%>%
         mutate(Reasons = "DEATH")%>%
         ungroup() %>%
-        select(Reasons,count)
+        dplyr::select(Reasons,count)
     } else {
       Reasons <- I("DEATH")
       count <- c(0)
@@ -852,7 +972,7 @@ server <- function(input, output) {
       disabling_results_final <- filter(disabling_results,SERIOUSNESS_ENG == "Yes", DISABILITY == 1)%>%
         mutate(Reasons = "DISABILITY")%>%
         ungroup() %>%
-        select(Reasons,count)
+        dplyr::select(Reasons,count)
     } else {
       Reasons <- I("DISABILITY")
       count <- c(0)
@@ -867,7 +987,7 @@ server <- function(input, output) {
       hospital_results_final <- filter(hospital_results,SERIOUSNESS_ENG == "Yes",HOSP_REQUIRED == 1) %>%
         mutate(Reasons = "HOSPITALIZATION") %>%
         ungroup() %>%
-        select(Reasons,count)
+        dplyr::select(Reasons,count)
     } else {
       Reasons <- I("HOSPITALIZATION")
       count <- c(0)
@@ -882,7 +1002,7 @@ server <- function(input, output) {
       lifethreaten_results_final <- filter(lifethreaten_results,SERIOUSNESS_ENG == "Yes", LIFE_THREATENING == 1)%>%
         mutate(Reasons = "LIFE_THREATENING")%>%
         ungroup() %>%
-        select(Reasons,count)
+        dplyr::select(Reasons,count)
     } else {
       Reasons <- I("LIFE_THREATENING")
       count <- c(0)
@@ -897,7 +1017,7 @@ server <- function(input, output) {
       serother_results_final <-filter(serother_results,SERIOUSNESS_ENG == "Yes", OTHER_MEDICALLY_IMP_COND == 1)%>%
         mutate(Reasons = "OTHER_MEDICALLY_IMP_COND")%>%
         ungroup() %>%
-        select(Reasons,count)
+        dplyr::select(Reasons,count)
     } else {
       Reasons <- I("OTHER_MEDICALLY_IMP_COND")
       count <- c(0)
@@ -912,7 +1032,7 @@ server <- function(input, output) {
     if(nrow(serious_reason)!=0){
       serious_reason <- serious_reason %>% 
         mutate(NotSpecified = "Yes")%>%
-        select(REPORT_ID, NotSpecified) 
+        dplyr::select(REPORT_ID, NotSpecified) 
       serious_reason_df <- left_join(data,serious_reason)%>% mutate(SERIOUSNESS_ENG = ifelse(REPORT_ID == 645744, "Yes", SERIOUSNESS_ENG))
       
       # NotSpecified
@@ -923,7 +1043,7 @@ server <- function(input, output) {
         NotSpecified_results_final <- filter(NotSpecified_results,SERIOUSNESS_ENG == "Yes",NotSpecified == "Yes")%>%
           mutate(Reasons = "NotSpecified")%>%
           ungroup() %>%
-          select(Reasons,count) 
+          dplyr::select(Reasons,count) 
       } else {
         Reasons <- I("NotSpecified")
         count <- c(0)
@@ -950,7 +1070,7 @@ server <- function(input, output) {
     
     # Calculate the percentage of each reason
     serious_reasons_restults <- mutate(serious_reasons_restults, percentage = count/total_serious_final*100 %>% signif(digits = 3)) %>% 
-      select(-count) %>%
+      dplyr::select(-count) %>%
       arrange(desc(percentage))
     
     # GoogleVis plot html: use plot() to graph it
@@ -1123,6 +1243,52 @@ server <- function(input, output) {
                  )
     )
     
+  })
+  
+  ##################### Create DISP Tab Graphs #######################
+  output$signalplot_BCPNN<- renderGvis({
+    data <- cv_disp_BCPNN()
+    data_final <- data %>% top_n(10)
+    
+    # GoogleVis plot html: use plot() to graph it
+    gvisBarChart(data_final,
+                 xvar = "D_AR_Comb",
+                 yvar = "Q_0.025(log(IC))",
+                 options = list(
+                   #vAxes="[{title:'D*AR Combination'}",
+                   legend = "{position:'none'}",
+                   bars = 'horizontal',
+                   # axes= "x: {
+                   #   0: { side: 'top', label: 'Number of Reports'}}",
+                   bar = list(groupWidth =  '90%'),
+                   height=500,
+                   vAxis.textStyle = "{color:'black',fontName:'Courier',fontSize:5}",
+                   title = "Top 10 Signals Detected By BCPNN Method",
+                   hAxes="[{title:'Strength of Signal'}]"
+                 )
+    )
+    
+  })
+  
+  output$signalplot_PRR <- renderGvis({
+    data<- cv_disp_PRR()
+    
+    signals_plot <- gvisBarChart(data,
+                                 xvar = "D_AR_Comb",
+                                 yvar = "LB95(log(PRR))",
+                                 options = list(
+                                   #vAxes="[{title:'D*AR Combination'}",
+                                   legend = "{position:'none'}",
+                                   bars = 'horizontal',
+                                   # axes= "x: {
+                                   #   0: { side: 'top', label: 'Number of Reports'}}",
+                                   bar = list(groupWidth =  '90%'),
+                                   height=500,
+                                   vAxis.textStyle = "{color:'black',fontName:'Courier',fontSize:5}",
+                                   title = "Top 10 Signals Detected By PRR Method",
+                                   hAxes="[{title:'Strength of Signal'}]"
+                                 )
+    )
   })
 }
 
