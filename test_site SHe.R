@@ -196,7 +196,8 @@ PRR_results$NB.SIGNALS
 
 # bar chart for PRR methid
 signals <-  PRR_results$SIGNAL %>% collect()
-signals_final <- signals %>% mutate(D_AR_Comb = paste(signals$`drug code`, " * ", signals$`event effect`)) %>% arrange(desc(`LB95(log(PRR))`)) %>% top_n(10,wt=`LB95(log(PRR))`)
+signals_final <- signals %>% mutate(D_AR_Comb = paste(signals$`drug code`, " * ", signals$`event effect`)) %>% 
+                  arrange(desc(`LB95(log(PRR))`)) %>% top_n(10,wt=`LB95(log(PRR))`)
 
 signals_plot <- gvisBarChart(signals_final,
                              xvar = "D_AR_Comb",
@@ -218,9 +219,30 @@ strength_plot <- plot(signals_plot)
 
 # bubble chart with x-axis= PRR & y-axis = LB95(log(PRR)) & bubble is count/number of cases for D*AR pair
 PRR_bubble_df <- PRR_results$SIGNALS %>% collect() 
-PRR_bubble_df_final <- PRR_bubble_df %>% mutate(D_AR_Comb = paste(signals$`drug code`, " * ", signals$`event effect`))%>% arrange(desc(`LB95(log(PRR))`)) %>% top_n(10,wt=`LB95(log(PRR))`)
-PRR_bubble_plot <- ggplot(PRR_bubble_df_final,)
+PRR_bubble_df_final <- PRR_bubble_df %>% mutate(D_AR_Comb = paste(PRR_bubble_df$`drug code`, " * ", PRR_bubble_df$`event effect`))%>% 
+                        arrange(desc(`LB95(log(PRR))`)) %>% top_n(200,wt=`LB95(log(PRR))`)
 
 
+  
+%>% dplyr::select(count,`LB95(log(PRR))`,PRR)
+
+PRR_bubble_plot <- ggplot(PRR_bubble_df_final,aes(x=PRR,y=`LB95(log(PRR))`, size=count, label=`event effect`, colour= PRR))+
+                    geom_point()+
+                    geom_text(size=3, check_overlap=TRUE, nudge_y=-0.03)+
+                    scale_size_area(max_size = 15)+
+                    scale_x_continuous(name="PRR")+
+                    scale_y_continuous(name="Lower Bound of 95% Confidence Interval of log(PRR)") +theme_bw()
+PRR_bubble_plot
 
 
+PRR_bubble_df_final1 <- PRR_bubble_df %>% mutate(D_AR_Comb = paste(PRR_bubble_df$`drug code`, " * ", PRR_bubble_df$`event effect`))%>% 
+  arrange(desc(`LB95(log(PRR))`)) %>% top_n(20,wt=`LB95(log(PRR))`) %>% collect()
+
+PRR_GoogBubbleChart <- gvisBubbleChart(data = PRR_bubble_df_final1, idvar="D_AR_Comb", xvar="PRR", yvar="LB95(log(PRR))", sizevar="PRR",
+                                       options=list(
+                                         height= 1000
+                                       )
+                                       )
+plot(PRR_GoogBubbleChart)
+
+, colorvar="PRR", sizevar="count"
