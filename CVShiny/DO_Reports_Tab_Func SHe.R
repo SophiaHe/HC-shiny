@@ -19,12 +19,12 @@ reports_tab <- function(current_brand,current_rxn,current_gender,current_date_ra
   #ptm <- proc.time()
   cv_reports_sorted_rp <- if(current_gender != "All"){
                           cv_reports %>%
-                          select(REPORT_ID, SERIOUSNESS_ENG, REPORTER_TYPE_ENG, DEATH, DISABILITY, CONGENITAL_ANOMALY,LIFE_THREATENING, HOSP_REQUIRED, 
+                          dplyr::select(REPORT_ID, SERIOUSNESS_ENG, REPORTER_TYPE_ENG, DEATH, DISABILITY, CONGENITAL_ANOMALY,LIFE_THREATENING, HOSP_REQUIRED, 
                                  OTHER_MEDICALLY_IMP_COND, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
                           filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2], GENDER_ENG == current_gender)
                           } else {
                             cv_reports %>%
-                              select(REPORT_ID, SERIOUSNESS_ENG, REPORTER_TYPE_ENG, DEATH, DISABILITY, CONGENITAL_ANOMALY,LIFE_THREATENING, HOSP_REQUIRED, 
+                              dplyr::select(REPORT_ID, SERIOUSNESS_ENG, REPORTER_TYPE_ENG, DEATH, DISABILITY, CONGENITAL_ANOMALY,LIFE_THREATENING, HOSP_REQUIRED, 
                                      OTHER_MEDICALLY_IMP_COND, DATINTRECEIVED_CLEAN,GENDER_ENG) %>%
                               filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
                                       }
@@ -41,11 +41,11 @@ reports_tab <- function(current_brand,current_rxn,current_gender,current_date_ra
                       }
   cv_reactions_rp <- if(is.na(current_rxn) == FALSE){
                         cv_reactions %>%
-                          select(REPORT_ID, PT_NAME_ENG) %>%
+                          dplyr::select(REPORT_ID, PT_NAME_ENG) %>%
                           filter(PT_NAME_ENG == current_rxn)
                       } else {
                         cv_reactions %>%
-                          select(REPORT_ID, PT_NAME_ENG)
+                          dplyr::select(REPORT_ID, PT_NAME_ENG)
                       }
  
   reports_tab_master <-  cv_reports_sorted_rp%>%
