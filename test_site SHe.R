@@ -6,7 +6,7 @@ hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hco
 
 
 
-current_brand <- "RAMICADE"
+current_brand <- "REMICADE"
 current_rxn <- "Drug ineffective"
 current_gender <- "All"
 current_date_range <- c(ymd("19650101", ymd("20160527")))
@@ -17,27 +17,6 @@ current_date_range <- c(ymd("19650101", ymd("20160527")))
 # RAMICADE vs. HUMIRA ([CV_Shiny_DO SHe.R#485], <-.data.frame: replacement has 1 row, data has 0) SOLVED!!!!
 # DIGOXIN: [CV_Shiny_DO SHe.R#492], Error in if: missing value where TRUE/FALSE needed SOLVED!!!
 
-####################################################################################################################
-cv_drug_product <- tbl(hcopen, "cv_drug_product") %>% collect()
-head(cv_drug_product)
-cv_drug_product$DRUG_PRODUCT_ID[cv_drug_product$DRUGNAME == "VITAMIN C"]
-
-####################################################################################################################
-df <- cv_report_drug_indication %>% collect()
-distinct(df[df$DRUGNAME== "ABILIFY",],INDICATION_NAME_ENG) %>% select(DRUGNAME, INDICATION_NAME_ENG)
-
-a <- dplyr::summarise(group_by(cv_report_drug_indication,DRUGNAME ),count=n_distinct(INDICATION_NAME_ENG)) %>% dplyr::arrange(desc(count)) %>% collect()
-dim(a)
-
-
-
-b <- cv_reports %>% collect()
-table(b$GENDER_ENG)
-
-data <- patients_tab(current_brand=current_brand,current_rxn=current_rxn,current_gender =current_gender,current_date_range=current_date_range)
-
-
-####################################################################################################################
 
 observe({
   updateSelectizeInput(session, )
@@ -75,24 +54,54 @@ current_year <- "2015"
 
 
 
-####################################################################################################################
+########################################################################################################################################
 ################################################ Disproportionality analysis using BCPNN ###############################################
-current_date_range <- c(ymd("20130331", ymd("20150331")))
+#current_date_range <- c(ymd("20140101", ymd("20140331")))
 
 library(dplyr)
-part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
-          dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
-          inner_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
-
-part2 <- cv_reports  %>% 
-          filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
-          dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
-
-DISP_final <- dplyr::summarise(group_by(inner_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% collect()
-
 library(PhViD)
-bayes_table <- as.PhViD(DISP_final, MARGIN.THRES = 1) 
-bayes_result <- BCPNN(bayes_table, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
+BCPNN_signal <- function(current_date_range){
+  part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
+            dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
+            inner_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
+  
+  part2 <- cv_reports  %>% 
+            filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
+            dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
+  
+  DISP_final <- dplyr::summarise(group_by(inner_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
+  
+  
+  bayes_table_BCPNN <- as.PhViD(DISP_final, MARGIN.THRES = 1) 
+  bayes_result <- BCPNN(bayes_table_BCPNN, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
+  #signals <- as.data.table(bayes_result$SIGNAL)
+  signals <-  bayes_result$SIGNAL %>% collect()
+  signals_final <- signals %>% mutate(D_AR_Comb = paste(signals$`drug code`, " * ", signals$`event effect`)) %>% arrange(desc(`Q_0.025(log(IC))`)) %>% top_n(10,wt=`Q_0.025(log(IC))`)
+  
+  signals_plot <- gvisBarChart(signals_final,
+                               xvar = "D_AR_Comb",
+                               yvar = "Q_0.025(log(IC))",
+                               options = list(
+                                 #vAxes="[{title:'D*AR Combination'}",
+                                 legend = "{position:'none'}",
+                                 bars = 'horizontal',
+                                 # axes= "x: {
+                                 #   0: { side: 'top', label: 'Number of Reports'}}",
+                                 bar = list(groupWidth =  '90%'),
+                                 height=500,
+                                 vAxis.textStyle = "{color:'black',fontName:'Courier',fontSize:5}",
+                                 title = "Top 10 Signals Detected",
+                                 hAxes="[{title:'Strength of Signal'}]"
+                               )
+                  )
+  strength_plot <- plot(signals_plot)
+  return(strength_plot)
+}
+
+BCPNN_signal(current_date_range=c(ymd("20140101", ymd("20140331"))))
+
+########################################################### Explorative analysis on BCPNN function #####################################################
+
 str(bayes_result)
 summary(bayes_result)
 
@@ -103,9 +112,13 @@ bayes_result$NB.SIGNALS
 
 str(bayes_table$data)
 bayes_table$data[1:2,]
-a <- as.data.frame(bayes_result$SIGNAL)
+a <- as.data.table(bayes_result$SIGNAL)
+
+
+  b<- a %>% mutate(D_AR_Comb = paste(a$`drug code`, " * ", a$`event effect`))
+  b$`Q_0.025(log(IC))`
 head(a)
-####################################################################################################################
+
 test <- DISP_final[DISP_final$ACTIVE_INGREDIENT_NAME == "&1-proteinase inhibitor (human)"]
 sum(test$count)
 test1 <- DISP_final[DISP_final$PT_NAME_ENG == "Chills"]
@@ -121,6 +134,11 @@ bayes_table1 <-bayes_table %>% as.data.table(n=-1)
 str(bayes_table1)
 bayes_table1$data[2]
 
+norms <- rnorm(100,mean=9,sd=2)
+norms2 <- rnorm(100, mean=4, sd=2)
+
+qnorm(0.025,mean=4,sd=2)
+
 
 IC <- log((68/491363)/((145/491363)*(1742/491363)),exp(2))
 IC
@@ -135,6 +153,8 @@ str(All_Sig)
 DISP_final[DISP_final$ACTIVE_INGREDIENT_NAME == "aminocaproic acid"]
 any(DISP_final$ACTIVE_INGREDIENT_NAME == "(1s, 2s)-2-methylamino-1-phenylpropan-1-ol hydrochloride")
 head(DISP_final)
+
+DISP_final1 <- DISP_final[1:1000,]
 write.csv(DISP_final, file = "test.csv")
 
 
@@ -148,13 +168,58 @@ write.csv(DISP_final, file = "test.csv")
 
 0.2922556 +0.6655419 
 
+####################################################################################################################
+
+################################################ Disproportionality analysis using PRR ###############################################
+current_date_range <- c(ymd("20140101", ymd("20140331")))
+
+part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
+  dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
+  inner_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
+
+part2 <- cv_reports  %>% 
+  filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
+  dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
+
+DISP_final <- dplyr::summarise(group_by(inner_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
 
 
+bayes_table_PRR <- as.PhViD(DISP_final, MARGIN.THRES = 1) 
+
+PRR_results <- PRR(bayes_table_PRR, RR0=1, MIN.n11 = 1, DECISION = 3, DECISION.THRES = 0.05, RANKSTAT = 2)
+
+PRR_results$INPUT.PARAM
+head(PRR_results$ALLSIGNALS)  # LB95(log(PRR)) might be Inf because C=0 in the contingency table
+head(PRR_results$SIGNALS)     # FDR can only be estimated when the stats of interest is p-value (in this case, it's the LB95(log(PRR)))
+PRR_results$NB.SIGNALS
 
 
+# bar chart for PRR methid
+signals <-  PRR_results$SIGNAL %>% collect()
+signals_final <- signals %>% mutate(D_AR_Comb = paste(signals$`drug code`, " * ", signals$`event effect`)) %>% arrange(desc(`LB95(log(PRR))`)) %>% top_n(10,wt=`LB95(log(PRR))`)
 
+signals_plot <- gvisBarChart(signals_final,
+                             xvar = "D_AR_Comb",
+                             yvar = "LB95(log(PRR))",
+                             options = list(
+                               #vAxes="[{title:'D*AR Combination'}",
+                               legend = "{position:'none'}",
+                               bars = 'horizontal',
+                               # axes= "x: {
+                               #   0: { side: 'top', label: 'Number of Reports'}}",
+                               bar = list(groupWidth =  '90%'),
+                               height=500,
+                               vAxis.textStyle = "{color:'black',fontName:'Courier',fontSize:5}",
+                               title = "Top 10 Signals Detected By PRR Method",
+                               hAxes="[{title:'Strength of Signal'}]"
+                             )
+)
+strength_plot <- plot(signals_plot)
 
-
+# bubble chart with x-axis= PRR & y-axis = LB95(log(PRR)) & bubble is count/number of cases for D*AR pair
+PRR_bubble_df <- PRR_results$SIGNALS %>% collect() 
+PRR_bubble_df_final <- PRR_bubble_df %>% mutate(D_AR_Comb = paste(signals$`drug code`, " * ", signals$`event effect`))%>% arrange(desc(`LB95(log(PRR))`)) %>% top_n(10,wt=`LB95(log(PRR))`)
+PRR_bubble_plot <- ggplot(PRR_bubble_df_final,)
 
 
 
