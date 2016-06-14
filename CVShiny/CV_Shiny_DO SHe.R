@@ -12,6 +12,7 @@ library(DT)
 library(googleVis)
 # library(openfda)
 library(stringr)
+library(PhViD)
 
 
 
@@ -75,12 +76,12 @@ ui <- dashboardPage(
   dashboardHeader(title = "CV Shiny"),
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Download", tabName = "downloaddata", icon = icon("fa fa-download")),
       menuItem("Reports", tabName = "reportdata", icon = icon("hospital-o")),
       menuItem("Drugs", tabName = "drugdata", icon = icon("flask")),
       menuItem("Patients", tabName = "patientdata", icon = icon("user-md")),
       menuItem("Reactions", tabName = "rxndata", icon = icon("heart-o")),
-      
+      menuItem("Signal Detection", tabName = "DISPdata", icon = icon("fa fa-binoculars")),
+      menuItem("Download", tabName = "downloaddata", icon = icon("fa fa-download")),
       menuItem("About", tabName = "aboutinfo", icon = icon("info"))
     ),
     selectizeInput("search_brand", 
@@ -115,7 +116,16 @@ ui <- dashboardPage(
     actionButton("searchButton", "Search"),
     tags$br(),
     tags$h3(strong("Current Search:")),
-    tableOutput("current_search")
+    tableOutput("current_search"),
+    tags$h3(strong("Disproportionality Analysis: ")),
+    dateRangeInput("searchDateRange_DISP_ANALYSIS",
+                   "Date Range for Disproportionality Analysis",
+                   start = "1965-01-01",
+                   end = "1965-03-31",
+                   max = Sys.Date(),
+                   startview = "year",
+                   format = "yyyy-mm-dd"),
+    actionButton("DISPButton", "Go")
   ), 
   
   dashboardBody(
@@ -172,10 +182,23 @@ ui <- dashboardPage(
       tabItem(tabName = "rxndata",
               fluidRow(
                 box(htmlOutput("outcomeplot"), title = tags$h2("Outcomes (all reactions)")),
-                box(htmlOutput("rxnTbl"), title = tags$h2("Top10 Reactions Associated with Searched Drug")),
+                box(htmlOutput("rxnTbl"), title = tags$h2("Top10 Reactions Associated with Searched Drug"))
+                # box(
+                #   tags$h2("Download Data Used for Current Tab"),
+                #   downloadButton('downloadData_RXN', 'Download')
+                # )
+              )
+      ),
+      
+      tabItem(tabName = "DISPdata",
+              fluidRow(
                 box(
-                  tags$h2("Download Data Used for Current Tab"),
-                  downloadButton('downloadData_RXN', 'Download')
+                  htmlOutput("signalplot_BCPNN"), title = tags$h2("Top 10 Signals Detected By BCPNN Method"),width=4.5,
+                  tags$p("BCPNN method detects signals based on Information Component (IC) which evaluate the association between each Drug*AR pair. Those ICs are then sorted based on strength of the signals. Details about this method are explained in the About Tab.")
+                ),
+                box(
+                  htmlOutput("signalplot_PRR"), title = tags$h2("Top 10 Signals Detected By PRR Method"),width=4.5,
+                  tags$p("PRR method detects signals based on Proportional Reporting Ratio (PRR) which detects more-frequently-reported Drug*AR pairs. Those PRR are then sorted based on their respective strengths. Details about this method are explained in the About Tab.")
                 )
               )
       ),
@@ -227,13 +250,20 @@ ui <- dashboardPage(
                 tags$p("Jr. Data Scientist Co-op, Health Products and Food Branch"),
                 tags$p("Health Canada / Government of Canada"),
                 tags$p("sophia.he@canada.ca")
+                ),
+                box(
+                  tags$h3("Disproportionality Analysis - Bayesian confidence propagation neural network (BCPNN) Method"),
+                  tags$p("..."),
+                  tags$br(),
+                  tags$h3("Disproportionality Analysis - Proportional Reporting Ratio (PRR) Method"),
+                  tags$p("...")
                 )
               )
       )
               )
     ), 
   skin = "blue"
-      )
+)
 
 
 ############## Server of shiny ########################
@@ -490,9 +520,9 @@ server <- function(input, output) {
   })
   
   
-  ####################### NEED WORK HERE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ########## Download searched dataset ############# 
   cv_download_reports <- reactive({
-    input$download_reports
+    input$searchButton
     #codes about dplyr::select specific generic, brand and reaction name in search side bar, making sure they're not NA
     current_brand <- isolate(ifelse(input$search_brand == "",
                                     NA,
@@ -506,6 +536,7 @@ server <- function(input, output) {
     current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
     
+    input$download_reports
     cv_reports_sorted_dl <- if(current_gender != "All"){
                               cv_reports %>%
                                 filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2], GENDER_ENG == current_gender)
@@ -534,15 +565,67 @@ server <- function(input, output) {
                             collect()
     return(reports_tab_master) 
   })
+  
+  
+  ############################## DISP tab ##############################
+  cv_disp_BCPNN <- reactive({
+    input$DISPButton
+    current_date_range <- isolate(input$searchDateRange_DISP_ANALYSIS)
+    #current_date_range <- c(ymd("20000401", ymd("20000630")))
+    escape.POSIXt <- dplyr:::escape.Date
+    
+    part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
+      dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
+      inner_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
+    
+    part2 <- cv_reports  %>% 
+      filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
+      dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
+    
+    DISP_final <- dplyr::summarise(group_by(inner_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
+    
+   
+    bayes_table <- as.PhViD(DISP_final, MARGIN.THRES = 1) 
+    bayes_result <- BCPNN(bayes_table, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
+    
+    signals <- as.data.table(bayes_result$SIGNAL) 
+    signals_final <- signals %>% mutate(D_AR_Comb = paste(signals$`drug code`, " * ", signals$`event effect`))
+    return(signals_final)
+  })
+  
+  cv_disp_PRR <- reactive({
+    input$DISPButton
+    current_date_range <- isolate(input$searchDateRange_DISP_ANALYSIS)
+    escape.POSIXt <- dplyr:::escape.Date
+    
+    part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
+      dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
+      inner_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
+    
+    part2 <- cv_reports  %>% 
+      filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
+      dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
+    
+    DISP_final <- dplyr::summarise(group_by(inner_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
+    
+    
+    bayes_table_PRR <- as.PhViD(DISP_final, MARGIN.THRES = 1) 
+    
+    PRR_results <- PRR(bayes_table_PRR, RR0=1, MIN.n11 = 1, DECISION = 3, DECISION.THRES = 0.05, RANKSTAT = 2)
+    
+    signals <-  PRR_results$SIGNAL %>% collect()
+    signals_final <- signals %>% mutate(D_AR_Comb = paste(signals$`drug code`, " * ", signals$`event effect`)) %>% arrange(desc(`LB95(log(PRR))`)) %>% top_n(10,wt=`LB95(log(PRR))`)
+    return(signals_final)
+  })
 #########################################################################################################################################
 
   ############# Download Tab #################
-  output$downloadData_RXN <- downloadHandler(
-    filename = function() { paste('RXN_outcome', '.csv', sep='') },
-    content = function(file) {
-      write.csv(cv_reactions_tab(), file)
-    }
-  )
+  # output$downloadData_RXN <- downloadHandler(
+  #   filename = function() { paste('RXN_outcome', '.csv', sep='') },
+  #   content = function(file) {
+  #     write.csv(cv_reactions_tab(), file)
+  #   }
+  # )
   
   output$current_DISP_search <-renderTable({
     data<- cv_DISP_search()
@@ -952,6 +1035,52 @@ server <- function(input, output) {
                       )
     )
 
+  })
+  
+  ##################### Create DISP Tab Graphs #######################
+  output$signalplot_BCPNN<- renderGvis({
+    data <- cv_disp_BCPNN()
+    data_final <- data %>% top_n(10)
+    
+    # GoogleVis plot html: use plot() to graph it
+    gvisBarChart(data_final,
+                xvar = "D_AR_Comb",
+                yvar = "Q_0.025(log(IC))",
+                options = list(
+                  #vAxes="[{title:'D*AR Combination'}",
+                  legend = "{position:'none'}",
+                  bars = 'horizontal',
+                  # axes= "x: {
+                  #   0: { side: 'top', label: 'Number of Reports'}}",
+                  bar = list(groupWidth =  '90%'),
+                  height=500,
+                  vAxis.textStyle = "{color:'black',fontName:'Courier',fontSize:5}",
+                  title = "Top 10 Signals Detected By BCPNN Method",
+                  hAxes="[{title:'Strength of Signal'}]"
+                )
+    )
+    
+  })
+  
+  output$signalplot_PRR <- renderGvis({
+    data<- cv_disp_PRR()
+    
+    signals_plot <- gvisBarChart(data,
+                                 xvar = "D_AR_Comb",
+                                 yvar = "LB95(log(PRR))",
+                                 options = list(
+                                   #vAxes="[{title:'D*AR Combination'}",
+                                   legend = "{position:'none'}",
+                                   bars = 'horizontal',
+                                   # axes= "x: {
+                                   #   0: { side: 'top', label: 'Number of Reports'}}",
+                                   bar = list(groupWidth =  '90%'),
+                                   height=500,
+                                   vAxis.textStyle = "{color:'black',fontName:'Courier',fontSize:5}",
+                                   title = "Top 10 Signals Detected By PRR Method",
+                                   hAxes="[{title:'Strength of Signal'}]"
+                                 )
+    )
   })
 }
 
