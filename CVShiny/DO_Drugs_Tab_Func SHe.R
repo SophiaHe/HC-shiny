@@ -10,11 +10,11 @@ drugs_tab_indt <- function(current_brand, current_rxn,current_gender, current_da
   # Import tables with particular search items
   cv_reports_sorted_drg <- if(current_gender != "All"){
                             cv_reports %>%
-                            select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
+                            dplyr::select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
                             filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2], GENDER_ENG == current_gender) 
                           } else {
                             cv_reports %>%
-                              select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
+                              dplyr::select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
                               filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
                           }
   
@@ -29,15 +29,14 @@ drugs_tab_indt <- function(current_brand, current_rxn,current_gender, current_da
 
   cv_reactions_drg <- if(is.na(current_rxn) == FALSE){
                         cv_reactions %>%
-                          select(REPORT_ID, PT_NAME_ENG) %>%
+      dplyr::select(REPORT_ID, PT_NAME_ENG) %>%
                           filter(PT_NAME_ENG == current_rxn)
                       } else {
                         cv_reactions %>%
-                          select(REPORT_ID, PT_NAME_ENG)
+                          dplyr::select(REPORT_ID, PT_NAME_ENG)
                       }
   
-  cv_report_drug_indication_drg <- cv_report_drug_indication %>%
-                                    select(REPORT_ID, INDICATION_NAME_ENG)
+  cv_report_drug_indication_drg <- cv_report_drug_indication %>% dplyr::select(REPORT_ID, INDICATION_NAME_ENG)
   
   # Data frame used to obtain Top_25_indication bar chart: Indication is only associated with individual drug
   # When brand name is unspecified, chart shows top 25 indications associated with DRUGNAME="REMICADE" + date_range
@@ -74,21 +73,21 @@ drugs_tab_topdrg <- function(current_brand,current_rxn,current_gender,current_da
   df <- drugs_tab_indt(current_brand = current_brand, current_rxn = current_rxn, current_gender =current_gender, current_date_range=current_date_range)
  
   indications <-  dplyr::summarise(group_by(df, INDICATION_NAME_ENG),count=n_distinct(REPORT_ID))
-  top_indications<- indications %>% arrange(desc(count)) %>% top_n(n=1) %>% select(INDICATION_NAME_ENG)
+  top_indications<- indications %>% arrange(desc(count)) %>% top_n(n=1) %>% dplyr::select(INDICATION_NAME_ENG)
   top_indications_final <- top_indications$INDICATION_NAME_ENG
   
 
   # indication import
   cv_report_drug_indication_drg <- cv_report_drug_indication %>%
-                                    select(REPORT_ID, INDICATION_NAME_ENG, DRUGNAME) %>%
+    dplyr::select(REPORT_ID, INDICATION_NAME_ENG, DRUGNAME) %>%
                                     filter(INDICATION_NAME_ENG == top_indications_final)
   cv_reports_sorted_drg <- if(current_gender != "All"){
                             cv_reports %>%
-                              select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
+      dplyr::select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
                               filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2], GENDER_ENG == current_gender)
                             } else{
                               cv_reports %>%
-                                select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
+                                dplyr::select(REPORT_ID, DATINTRECEIVED_CLEAN, GENDER_ENG) %>%
                                 filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
                             }
   
@@ -104,7 +103,7 @@ drugs_tab_topdrg <- function(current_brand,current_rxn,current_gender,current_da
   drugs_tab_topdrg <- cv_reports_sorted_drg %>% 
                       inner_join(cv_report_drug_drg)%>%
                       semi_join(cv_report_drug_indication_drg) %>%
-                      select(REPORT_ID, DRUGNAME, GENDER_ENG) %>%
+                      dplyr::select(REPORT_ID, DRUGNAME, GENDER_ENG) %>%
                       collect()
 
   return(drugs_tab_topdrg)
