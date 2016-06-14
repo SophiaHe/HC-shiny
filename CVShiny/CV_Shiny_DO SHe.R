@@ -2,7 +2,6 @@ library(shinydashboard)
 library(jsonlite)
 library(lubridate)
 library(plyr)
-library(dplyr)
 library(data.table)
 library(ggplot2)
 library(magrittr)
@@ -13,7 +12,7 @@ library(googleVis)
 # library(openfda)
 library(stringr)
 library(PhViD)
-
+library(dplyr)
 
 
 
@@ -667,7 +666,7 @@ server <- function(input, output) {
     title <- ifelse(drug_selected == "Not Specified (All)", "All Drugs",drug_selected)
     plottitle <- paste("Drug Adverse Event Reports for", title)
     p <- adrplot(adrplot_test = data, plottitle = plottitle)
-    print(p)
+    #print(p)
     ggplotly(p)
   })
   
