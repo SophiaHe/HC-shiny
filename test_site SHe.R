@@ -6,8 +6,8 @@ hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hco
 
 
 
-current_brand <- "REMICADE"
-current_rxn <- "Drug ineffective"
+current_brand <- NA
+current_rxn <- NA
 current_gender <- "All"
 current_date_range <- c(ymd("19650101", ymd("20160527")))
 
@@ -56,7 +56,7 @@ current_year <- "2015"
 
 ########################################################################################################################################
 ################################################ Disproportionality analysis using BCPNN ###############################################
-#current_date_range <- c(ymd("20140101", ymd("20140331")))
+current_date_range <- c(ymd("20140101", ymd("20140331")))
 
 library(dplyr)
 library(PhViD)
@@ -171,7 +171,7 @@ write.csv(DISP_final, file = "test.csv")
 ####################################################################################################################
 
 ################################################ Disproportionality analysis using PRR ###############################################
-current_date_range <- c(ymd("20140101", ymd("20140331")))
+current_date_range <- c(ymd("20140101", ymd("20140601")))
 
 part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
   dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
@@ -219,14 +219,13 @@ strength_plot <- plot(signals_plot)
 
 # bubble chart with x-axis= PRR & y-axis = LB95(log(PRR)) & bubble is count/number of cases for D*AR pair
 PRR_bubble_df <- PRR_results$SIGNALS %>% collect() 
-PRR_bubble_df_final <- PRR_bubble_df %>% mutate(D_AR_Comb = paste(PRR_bubble_df$`drug code`, " * ", PRR_bubble_df$`event effect`))%>% 
-                        arrange(desc(`LB95(log(PRR))`)) %>% top_n(200,wt=`LB95(log(PRR))`)
+PRR_bubble_df_final <- PRR_bubble_df %>% mutate(D_AR_Comb = paste(PRR_bubble_df$`drug code`, " & ", PRR_bubble_df$`event effect`))%>% 
+                        arrange(desc(`LB95(log(PRR))`)) %>% top_n(5,wt=`PRR`)
 
 
   
-%>% dplyr::select(count,`LB95(log(PRR))`,PRR)
 
-PRR_bubble_plot <- ggplot(PRR_bubble_df_final,aes(x=PRR,y=`LB95(log(PRR))`, size=count, label=`event effect`, colour= PRR))+
+PRR_bubble_plot <- ggplot(PRR_bubble_df_final,aes(x=PRR/100000,y=`LB95(log(PRR))`, size=count, label=`D_AR_Comb`, colour= PRR))+
                     geom_point()+
                     geom_text(size=3, check_overlap=TRUE, nudge_y=-0.03)+
                     scale_size_area(max_size = 15)+
@@ -235,14 +234,71 @@ PRR_bubble_plot <- ggplot(PRR_bubble_df_final,aes(x=PRR,y=`LB95(log(PRR))`, size
 PRR_bubble_plot
 
 
-PRR_bubble_df_final1 <- PRR_bubble_df %>% mutate(D_AR_Comb = paste(PRR_bubble_df$`drug code`, " * ", PRR_bubble_df$`event effect`))%>% 
-  arrange(desc(`LB95(log(PRR))`)) %>% top_n(20,wt=`LB95(log(PRR))`) %>% collect()
+PRR_bubble_df_final1 <- PRR_bubble_df %>% mutate(D_AR_Comb = paste(PRR_bubble_df$`drug code`, "&", PRR_bubble_df$`event effect`))%>% 
+  arrange(desc(`PRR`)) %>% top_n(3,wt=`PRR`) %>% collect()
 
-PRR_GoogBubbleChart <- gvisBubbleChart(data = PRR_bubble_df_final1, idvar="D_AR_Comb", xvar="PRR", yvar="LB95(log(PRR))", sizevar="PRR",
-                                       options=list(
-                                         height= 1000
-                                       )
+
+
+#PRR_bubble_df_final1[1,3] <- 30
+
+
+PRR_GoogBubbleChart <- gvisBubbleChart(data = PRR_bubble_df_final1, idvar="D_AR_Comb", xvar="PRR", yvar="LB95(log(PRR))", sizevar="count",
+                                         options=list(
+                                           height= 1000,
+                                           sizeAxis = '{minSize:1}',
+                                           hAxis=paste("{title: 'Proportional Reporting Ratio (PRR)'}"),
+                                           vAxis=paste("{title: 'Lower Bound of 95% Confidence Interval of log(PRR)'}"),
+                                           bubble="{textStyle:{fontSize: '13'}}",
+                                           colorAxis = "{legend:{position: 'top'},colors: ['#90EE90', 'red']}"
+                                         )
                                        )
 plot(PRR_GoogBubbleChart)
 
-, colorvar="PRR", sizevar="count"
+######################################################################
+a <- as.data.frame(c(1,2,3))
+b<- as.data.frame(c("a","b","c"))
+c <- as.data.frame(as.)
+list <- list(a,b)
+a1 <- as.data.frame(list[1])
+
+size <- as.numeric(object.size(DISP_final))
+size *2
+
+######################################################################
+# function generate dataset for download with report category specified
+
+choices = c("Report Info", "Drug Info", "Reaction Info")
+
+current_brand <- NA
+current_rxn <- NA
+current_gender <- "All"
+current_date_range <- c(ymd("19650101", ymd("20160527")))
+
+hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+cv_reports <- tbl(hcopen, "cv_reports") 
+cv_drug_product_ingredients <-  tbl(hcopen, "cv_drug_product_ingredients")
+cv_report_drug <- tbl(hcopen,"cv_report_drug")
+cv_reactions <- tbl(hcopen,"cv_reactions") 
+
+
+part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% left_join(cv_report_drug) %>% 
+  dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
+  left_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
+
+part2 <- cv_reports  %>% 
+  filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
+  dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
+
+DISP_final <- dplyr::summarise(group_by(semi_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% collect()
+# dim = 1272598*3, size 38MB
+
+
+
+
+
+
+
+
+
+
+
