@@ -12,6 +12,7 @@ library(googleVis)
 # library(openfda)
 library(stringr)
 library(PhViD)
+library(utils)
 library(dplyr)
 
 
@@ -75,12 +76,13 @@ ui <- dashboardPage(
   dashboardHeader(title = "CV Shiny"),
   dashboardSidebar(
     sidebarMenu(
+      menuItem("Download", tabName = "downloaddata", icon = icon("fa fa-download")),
       menuItem("Reports", tabName = "reportdata", icon = icon("hospital-o")),
       menuItem("Drugs", tabName = "drugdata", icon = icon("flask")),
       menuItem("Patients", tabName = "patientdata", icon = icon("user-md")),
       menuItem("Reactions", tabName = "rxndata", icon = icon("heart-o")),
       menuItem("Signal Detection", tabName = "DISPdata", icon = icon("fa fa-binoculars")),
-      menuItem("Download", tabName = "downloaddata", icon = icon("fa fa-download")),
+      
       menuItem("About", tabName = "aboutinfo", icon = icon("info"))
     ),
     selectizeInput("search_brand", 
@@ -217,11 +219,22 @@ ui <- dashboardPage(
                                format = "yyyy-mm-dd"),
                 actionButton("searchDISPButton", "Search"),
                 tableOutput("current_DISP_search"),
+                tableOutput("current_DISP_size"),
                 downloadButton('downloadData_DISP', 'Download')
                 ),
                 
                 box(
                   tags$h2("Download Data Used for Current Searched Combination"),
+                  tags$h3("Please select an information category: "),
+                  selectizeInput("search_dataset_type",
+                                 "Information Category",
+                                 choices = c("Report Info", "Drug Info", "Reaction Info"),  
+                                 options = list(create = TRUE,
+                                                placeholder = 'Please select an option below',
+                                                onInitialize = I('function() { this.setValue(""); }'))),
+                  actionButton("search_report_type_dl","Go"),
+                  tableOutput("download_reports_type"),
+                  tableOutput("download_reports_size"),
                   downloadButton('download_reports', 'Download')
                 )
                 # box(plotOutput("drugplot"),
@@ -489,33 +502,42 @@ server <- function(input, output) {
     return(drugs_rxn_df)
   })
   
-  cv_DISP_search <- reactive({
+  # cv_DISP_search <- reactive({
+  #   input$searchDISPButton
+  #   current_date_range <- isolate(input$searchDateRange_DISP)
+  #   escape.POSIXt <- dplyr:::escape.Date
+  #   
+  #   search_tab_df <- data.frame(names = c("Date Range"),
+  #                               terms = paste(current_date_range[1]," to ", current_date_range[2]),
+  #                               stringsAsFactors=FALSE)
+  #   return(search_tab_df)
+  # })
+  
+  cv_download_DISP <- reactive({
     input$searchDISPButton
     current_date_range <- isolate(input$searchDateRange_DISP)
     escape.POSIXt <- dplyr:::escape.Date
     
-    search_tab_df <- data.frame(names = c("Date Range"),
-                                terms = paste(current_date_range[1]," to ", current_date_range[2]),
-                                stringsAsFactors=FALSE)
-    return(search_tab_df)
-  })
-  
-  cv_download_DISP <- reactive({
-    input$downloadData_DISP
-    current_date_range <- isolate(input$searchDateRange_DISP)
-    escape.POSIXt <- dplyr:::escape.Date
-    
-    part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
-            dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
-            inner_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
+    part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% left_join(cv_report_drug) %>% 
+      dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
+      left_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
     
     part2 <- cv_reports  %>% 
-              filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
-              dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
+      filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
+      dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
     
-    DISP_final <- dplyr::summarise(group_by(inner_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% collect()
+    DISP_final <- dplyr::summarise(group_by(semi_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% collect()
     
-    return(DISP_final)
+    DISP_date_range <- as.data.frame(
+      paste("Data Range: ", current_date_range[1], "to", current_date_range[2])
+    )
+    DISP_final_size <- as.data.frame(
+      paste("Size of Dataset for Dispropotionality Analysis is ",round(as.numeric(object.size(DISP_final))/1000000,digits=0),"MB")
+      )
+    
+    return(list(DISP_final <- DISP_final,
+                DISP_date_range <- DISP_date_range,
+                DISP_final_size <- DISP_final_size))
   })
   
   
@@ -535,34 +557,28 @@ server <- function(input, output) {
     current_date_range <- isolate(input$searchDateRange)
     escape.POSIXt <- dplyr:::escape.Date
     
-    input$download_reports
-    cv_reports_sorted_dl <- if(current_gender != "All"){
-                              cv_reports %>%
-                                filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2], GENDER_ENG == current_gender)
-                            } else {
-                              cv_reports %>%
-                                filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2])
-                            }
+    # report type used for downloading dataset
+    input$search_report_type_dl
+    current_report_type <- isolate(ifelse(input$search_dataset_type == "",
+                                   "Report Info",
+                                   input$search_dataset_type))
     
-    cv_report_drug_dl <- if(is.na(current_brand) == FALSE){
-                            cv_report_drug %>%
-                              filter(DRUGNAME == current_brand)
-                          } else {
-                            cv_report_drug 
-                          }
-    cv_reactions_dl <- if(is.na(current_rxn) == FALSE){
-                        cv_reactions %>%
-                          filter(PT_NAME_ENG == current_rxn)
-                      } else {
-                        cv_reactions
-                      }
-    #cv_report_drug_indication_dl <- cv_report_drug_indication 
+    #input$download_reports
+    setwd("~/CVShiny")
+    source("Download_type_Func SHe.R")
     
-    reports_tab_master <-  cv_reports_sorted_dl%>%
-                            inner_join(cv_report_drug_dl) %>%
-                            inner_join(cv_reactions_dl)%>%
-                            collect()
-    return(reports_tab_master) 
+    reports_tab_master <- download(current_brand=current_brand,current_rxn=current_rxn,current_gender=current_gender,current_date_range=current_date_range,current_report_type=current_report_type)
+    
+    download_type <- as.data.frame(
+      paste("Report Type to be downloaded is ",current_report_type)
+    )
+    
+    reports_tab_master_size <- as.data.frame(
+      paste("Size of Dataset is ",round(as.numeric(object.size(reports_tab_master))/1000000,digits=0),"MB")
+    )
+    return(list(reports_tab_master <- reports_tab_master,
+                download_type <- download_type,
+                reports_tab_master_size <- reports_tab_master_size)) 
   })
   
   
@@ -573,16 +589,15 @@ server <- function(input, output) {
     #current_date_range <- c(ymd("20000401", ymd("20000630")))
     escape.POSIXt <- dplyr:::escape.Date
     
-    part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
+    part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% left_join(cv_report_drug) %>% 
       dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
-      inner_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
+      left_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
     
     part2 <- cv_reports  %>% 
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
       dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
     
-    DISP_final <- dplyr::summarise(group_by(inner_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
-    
+    DISP_final <- dplyr::summarise(group_by(semi_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
    
     bayes_table <- as.PhViD(DISP_final, MARGIN.THRES = 1) 
     bayes_result <- BCPNN(bayes_table, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
@@ -597,16 +612,15 @@ server <- function(input, output) {
     current_date_range <- isolate(input$searchDateRange_DISP_ANALYSIS)
     escape.POSIXt <- dplyr:::escape.Date
     
-    part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
+    part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% left_join(cv_report_drug) %>% 
       dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
-      inner_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
+      left_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
     
     part2 <- cv_reports  %>% 
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
       dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
     
-    DISP_final <- dplyr::summarise(group_by(inner_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
-    
+    DISP_final <- dplyr::summarise(group_by(semi_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
     
     bayes_table_PRR <- as.PhViD(DISP_final, MARGIN.THRES = 1) 
     
@@ -619,32 +633,42 @@ server <- function(input, output) {
 #########################################################################################################################################
 
   ############# Download Tab #################
-  # output$downloadData_RXN <- downloadHandler(
-  #   filename = function() { paste('RXN_outcome', '.csv', sep='') },
-  #   content = function(file) {
-  #     write.csv(cv_reactions_tab(), file)
-  #   }
-  # )
-  
-  output$current_DISP_search <-renderTable({
-    data<- cv_DISP_search()
-  }, include.rownames = FALSE, include.colnames = FALSE) 
-  
+  ############# DISP download ##########
   output$downloadData_DISP <- downloadHandler(
     filename = function() { paste('DISP_input', '.csv', sep='') },
     content = function(file) {
-      data <- cv_download_DISP()
+      data <- as.data.frame(cv_download_DISP()[1])
       write.csv(data, file)
     }
   )
   
+  output$current_DISP_search <-renderTable({
+    data<- as.data.frame(cv_download_DISP()[2])
+  }, include.rownames = FALSE, include.colnames = FALSE) 
+  
+  output$current_DISP_size <-  renderTable({
+    data <- as.data.frame(cv_download_DISP()[3])
+  }, include.rownames = FALSE, include.colnames = FALSE)
+  
+  
+
+  
+  ############ Download part ################
   output$download_reports <- downloadHandler(
     filename = function() { paste('reports', '.csv', sep='') },
     content = function(file) {
-      data <- cv_download_reports()
+      data <- as.data.frame(cv_download_reports()[1])
       write.csv(data, file)
     }
   )
+  
+  output$download_reports_type <-renderTable({
+    data <- as.data.frame(cv_download_reports()[2])
+  }, include.rownames = FALSE, include.colnames = FALSE)
+  
+  output$download_reports_size <- renderTable({
+    data <- as.data.frame(cv_download_reports()[3])
+  }, include.rownames = FALSE, include.colnames = FALSE)
   
   ############## Construct Current_Query_Table for generic name, brand name, adverse reaction term & date range searched ############
   output$current_search <- renderTable({
