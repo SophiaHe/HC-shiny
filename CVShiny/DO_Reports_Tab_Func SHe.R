@@ -4,7 +4,7 @@
 
 #current_brand <- NA
 #current_rxn <- NA
-#current_gender <- "Male"
+#current_gender <- "All"
 #current_date_range <- c(ymd("19650101", ymd("20160527")))
 
 
@@ -49,8 +49,8 @@ reports_tab <- function(current_brand,current_rxn,current_gender,current_date_ra
                       }
  
   reports_tab_master <-  cv_reports_sorted_rp%>%
-                          inner_join(cv_report_drug_rp) %>%
-                          inner_join(cv_reactions_rp) %>%
+                          semi_join(cv_report_drug_rp) %>%
+                          semi_join(cv_reactions_rp) %>%
                           collect()
   return(reports_tab_master) 
 }
