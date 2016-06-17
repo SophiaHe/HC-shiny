@@ -61,13 +61,13 @@ current_date_range <- c(ymd("20140101", ymd("20140331")))
 library(dplyr)
 library(PhViD)
 BCPNN_signal <- function(current_date_range){
-  part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
-            dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
-            inner_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
+  part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% left_join(cv_report_drug) %>% 
+    dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
+    left_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
   
   part2 <- cv_reports  %>% 
-            filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
-            dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
+    filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
+    dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
   
   DISP_final <- dplyr::summarise(group_by(inner_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
   
@@ -173,9 +173,9 @@ write.csv(DISP_final, file = "test.csv")
 ################################################ Disproportionality analysis using PRR ###############################################
 current_date_range <- c(ymd("20140101", ymd("20140601")))
 
-part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% inner_join(cv_report_drug) %>% 
+part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% left_join(cv_report_drug) %>% 
   dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
-  inner_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
+  left_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
 
 part2 <- cv_reports  %>% 
   filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
@@ -185,6 +185,8 @@ DISP_final <- dplyr::summarise(group_by(inner_join(part1,part2),ACTIVE_INGREDIEN
 
 
 bayes_table_PRR <- as.PhViD(DISP_final, MARGIN.THRES = 1) 
+head(bayes_table_PRR$L)
+
 
 PRR_results <- PRR(bayes_table_PRR, RR0=1, MIN.n11 = 1, DECISION = 3, DECISION.THRES = 0.05, RANKSTAT = 2)
 
@@ -212,10 +214,14 @@ signals_plot <- gvisBarChart(signals_final,
                                height=500,
                                vAxis.textStyle = "{color:'black',fontName:'Courier',fontSize:5}",
                                title = "Top 10 Signals Detected By PRR Method",
-                               hAxes="[{title:'Strength of Signal'}]"
+                               hAxes="[{title:'Strength of Signal'}]",
+                               series="{
+                                  0: {color: '#6495ED'},
+                                  3: {color: 'red'}
+                               }"
                              )
 )
-strength_plot <- plot(signals_plot)
+plot(signals_plot)
 
 # bubble chart with x-axis= PRR & y-axis = LB95(log(PRR)) & bubble is count/number of cases for D*AR pair
 PRR_bubble_df <- PRR_results$SIGNALS %>% collect() 
@@ -235,7 +241,7 @@ PRR_bubble_plot
 
 
 PRR_bubble_df_final1 <- PRR_bubble_df %>% mutate(D_AR_Comb = paste(PRR_bubble_df$`drug code`, "&", PRR_bubble_df$`event effect`))%>% 
-  arrange(desc(`PRR`)) %>% top_n(3,wt=`PRR`) %>% collect()
+  arrange(desc(`PRR`)) %>% top_n(10,wt=`PRR`) %>% collect()
 
 
 
@@ -257,7 +263,7 @@ plot(PRR_GoogBubbleChart)
 ######################################################################
 a <- as.data.frame(c(1,2,3))
 b<- as.data.frame(c("a","b","c"))
-c <- as.data.frame(as.)
+c <- as.data.frame()
 list <- list(a,b)
 a1 <- as.data.frame(list[1])
 
@@ -265,40 +271,91 @@ size <- as.numeric(object.size(DISP_final))
 size *2
 
 ######################################################################
-# function generate dataset for download with report category specified
 
-choices = c("Report Info", "Drug Info", "Reaction Info")
+####################################################################################################################
+ch <- gconnect("hyq9265@gmail.com", "")
 
-current_brand <- NA
-current_rxn <- NA
-current_gender <- "All"
-current_date_range <- c(ymd("19650101", ymd("20160527")))
+D <- c("D1","D2","D3","D3")
+AR<- c("AR1","AR2","AR3", "AR4")
+C <- c(3,4,5,6)
+df<- data.frame(D,AR,C, stringsAsFactors = FALSE)
 
-hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
-cv_reports <- tbl(hcopen, "cv_reports") 
-cv_drug_product_ingredients <-  tbl(hcopen, "cv_drug_product_ingredients")
-cv_report_drug <- tbl(hcopen,"cv_report_drug")
-cv_reactions <- tbl(hcopen,"cv_reactions") 
-
-
-part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% left_join(cv_report_drug) %>% 
-  dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
-  left_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
-
-part2 <- cv_reports  %>% 
-  filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
-  dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
-
-DISP_final <- dplyr::summarise(group_by(semi_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% collect()
-# dim = 1272598*3, size 38MB
+test_table <- as.PhVid_SHe(df,MARGIN.THRES = 1)
+test_table$L
+test_table$data
+test_table$N
 
 
+as.PhVid_SHe <- function (DATA.FRAME, MARGIN.THRES = 1) {
+  #test
+  DATA.FRAME <- df
+  MARGIN.THRES = 1
+  
+  data <- DATA.FRAME
+
+  # convert D, AR to FACTOR & convert count to DOUBLE 
+  data[, 1] <- as.factor(DATA.FRAME[, 1])
+  data[, 2] <- as.factor(DATA.FRAME[, 2])
+  data[, 3] <- as.double(DATA.FRAME[, 3])
+  
+  # change count column name of DATA.FRAME to n11
+  coln <- names(data)
+  names(data)[3] <- "n11"
+  
+  # build contingency table: D * AR & caculate row total & column total
+  data_cont <- xtabs(n11 ~ ., data = data)
+  n1._mat <- apply(data_cont, 1, sum) # row total
+  n.1_mat <- apply(data_cont, 2, sum) # column total
+  
+  #used to eliminate the drugs and the adverse events for which the marginal counts are less than MARGIN.THRES.
+  if (MARGIN.THRES > 1) {
+    while (sum(n1._mat < MARGIN.THRES) > 0 | sum(n.1_mat < MARGIN.THRES) > 0) { # sum() Logical true values are regarded as one, false values as zero. 
+      data_cont <- data_cont[n1._mat >= MARGIN.THRES, ]
+      data_cont <- data_cont[, n.1_mat >= MARGIN.THRES]
+      n1._mat <- apply(data_cont, 1, sum)
+      n.1_mat <- apply(data_cont, 2, sum)
+    }
+  }
+  coord <- which(data_cont != 0, arr.ind = TRUE) # Give the TRUE indices of a logical object
+  coord <- coord[order(coord[, 1]), ]
+  
+  Nb_n1. <- length(n1._mat) # number of types of drug in DATA.FRAME
+  Nb_n.1 <- length(n.1_mat) # number of types of AR in DATA.FRAME
+  
+  libel.medoc <- rownames(data_cont)[coord[, 1]]
+  libel.effet <- colnames(data_cont)[coord[, 2]]
+  n11 <- data_cont[coord]
+  N <- sum(n11)
+  n1. <- n1._mat[coord[, 1]]
+  n.1 <- n.1_mat[coord[, 2]]
+  
+  RES <- vector(mode = "list")
+  RES$L <- data.frame(libel.medoc, libel.effet)
+  colnames(RES$L) <- coln[1:2]
+  RES$data <- cbind(n11, n1., n.1)
+  rownames(RES$data) <- paste(libel.medoc, libel.effet)
+  RES$N <- N
+  RES
+}
+
+# RES$data is a matrix 
+# RES$L is a data frame
+# RES$N is a numeric value
+
+a<- RES$data
+a
+
+df
+libel.medoc <- as.character(df[,1])
+libel.effet <- as.character(df[,2])
 
 
+n1._df <- aggregate(C~D,df,sum) 
+n1._df <- n1._df %>% mutate(index = 1:nrow(n1._df))
 
+n.1_df <- aggregate(C~AR,df,sum)
+n.1_df <- n.1_df %>% mutate(index = 1: nrow(n.1_df))
 
+results <- n1._df %>% full_join(n.1_df, by="index")
 
-
-
-
-
+results <- cbind(libel.medoc,libel.effet,df$C,n1._df,n.1_df)
