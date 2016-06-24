@@ -37,14 +37,11 @@ head(cv_drug_rxn)
 str(cv_drug_rxn)
 
 cv_drug_rxn <- cv_drug_rxn %>% as.data.table(n=-1)
+# save(cv_drug_rxn, file = "cv_drug_rxn.RData")
 
 quarters <- levels(DISP$quarter)
 head(quarters)
 
-current_quarter <- 2000.2
-DISP <- cv_drug_rxn %>% filter(quarter == current_quater) 
-
-cv_drug_rxn$quarter<- as.factor(as.character(cv_drug_rxn$quarter))
 
 DISP <- cv_drug_rxn %>% dplyr::group_by(cv_drug_rxn, quarter)
 head(DISP)
@@ -53,46 +50,67 @@ tail(DISP)
 DISP_final <- dplyr::summarise(group_by(DISP,quarter,ing,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
 head(DISP_final)
 
-
+# all levels of quarters
 quarters <- levels(DISP$quarter)
 
-quarters <- c("1965.1","1965.2")
+# create lists
+DISP_table <- vector(mode = "list") # frequency table filtered by quarter
+bayes_table <- vector(mode = "list") # as.PhVid_SHe for each quarter of frequency table
+bayes_result <- vector(mode = "list") # BCPNN or PRR on each bayes_table
+bayes_result_final <- vector(mode = "list") # ALLSIGNALS of each bayes_result
 
-DISP_table <- vector(mode = "list")
-bayes_table <- vector(mode = "list")
-bayes_result <- vector(mode = "list")
+
 for(i in 1:length(quarters)){
   DISP_table[i]<-list(DISP_final %>% filter(quarter == quarters[i]))
   bayes_table[i] <- list(as.PhVid_SHe(data=as.data.frame(DISP_table[i]),MARGIN.THRES = 1))
-  bayes_result[i] <- BCPNN(bayes_table[i], RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
+  bayes_result[i] <- list(BCPNN(bayes_table[[i]], RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE))
+  bayes_result_final[i] <- list(bayes_result[[i]]$ALLSIGNALS)
 }
+
 str(DISP_table)
-head(DISP_table)
 head(DISP_table[1])
 
 str(bayes_table)
-head(bayes_table)
-head(bayes_table[[1]])
+head(bayes_table[[1]]$data)
 
-a <- bayes_table[1]
+str(bayes_result)
+
+str(bayes_result_final)
+head(bayes_result_final[[100]])
+
+
+
+quarters <- c("1965.1","1965.2")
+DISP_table1 <- vector(mode = "list")
+bayes_table1 <- vector(mode = "list")
+bayes_result1 <- vector(mode = "list")
+bayes_result_final1 <- vector(mode = "list")
+for(i in 1:length(quarters)){
+  DISP_table1[i]<-list(DISP_final %>% filter(quarter == quarters[i]))
+  bayes_table1[i] <- list(as.PhVid_SHe(data=as.data.frame(DISP_table1[i]),MARGIN.THRES = 3))
+  bayes_result1[i] <- list(BCPNN(bayes_table1[[i]], RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE))
+  bayes_result_final1[i] <- list(bayes_result1[[i]]$ALLSIGNALS)
+}
+
+str(DISP_table1)
+head(DISP_table1[[1]])
+
+str(bayes_table1)
+head(bayes_table1[[1]]$data)
+
+str(bayes_result1)
+
+str(bayes_result_final1)
+
+
+
+
+
 str(a)
-class(a)
-
-b<- BCPNN(a, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
-
 bayes_table<- DISP_final  %>% group_by(quarters) %>% do(
   as.PhVid_SHe(data=DISP_final,MARGIN.THRES = 1)
 )
-head(bayes_table)
-head(bayes_table$L)  
-head(bayes_table$data)     
-bayes_table$N
 
-bayes_result <- BCPNN(bayes_table, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
-bayes_result$INPUT.PARAM
-head(bayes_result$ALLSIGNALS)  
-head(bayes_result$SIGNALS)     
-bayes_result$NB.SIGNALS
 
 ######################################## as.PhVid_SHe function for margin.thres > 1 #################################################
 MARGIN.THRES <- 5
@@ -110,7 +128,7 @@ as.PhVid_SHe <- function(data, MARGIN.THRES){
     n.1_df_name <- aggregate(count~PT_NAME_ENG,data,sum) # 3116*2
     n.1_df_name_final <- n.1_df_name %>% filter(count >= MARGIN.THRES)%>% select(PT_NAME_ENG)%>% as.data.table(n=-1) #2840*2
     
-    df <- data %>% rename(n11 = count) # 300398
+    df <- data %>% rename(n11 = count) %>% select(-quarter) # 300398
     df1 <- df[(df$ing %in% n1._df_name_final$ing),] # 299129
     data_final <- df1[(df1$PT_NAME_ENG %in% n.1_df_name_final$PT_NAME_ENG),] # 298698
     
@@ -128,7 +146,7 @@ as.PhVid_SHe <- function(data, MARGIN.THRES){
     n1._df <- aggregate(count~ing,data,sum) %>% rename(n1. = count) %>% as.data.table(n=-1) #5143*2
     n.1_df <- aggregate(count~PT_NAME_ENG,data,sum)%>% rename(n.1 = count)%>% as.data.table(n=-1) # 3116*2
     
-    df <- data %>% rename(n11 = count)
+    df <- data %>% rename(n11 = count) %>% select(-quarter)
     output <- df %>% dplyr::left_join(n1._df) %>% filter(is.na(n1.) == FALSE)
     output1 <- df %>% left_join(n.1_df)%>% filter(is.na(n.1) == FALSE)
     
@@ -138,7 +156,7 @@ as.PhVid_SHe <- function(data, MARGIN.THRES){
     # RES$N
     RES2$N <- sum(df$n11)
     
-    RES2$L <- data.frame(df %>% select(ing,PT_NAME_ENG))
+    RES2$L <- data.frame(output %>% left_join(output1)  %>% filter(is.na(n.1) == FALSE) %>% select(ing,PT_NAME_ENG))
   }
   return(RES2)
 }
@@ -146,7 +164,41 @@ as.PhVid_SHe <- function(data, MARGIN.THRES){
 
 ####################################################################################################################
 
+################### test #############################################################################################################
+test <- as.PhVid_SHe1(data=DISP_final)
+head(test$L)  
+head(test$data)    
+test$N
+
+test1 <- as.PhVid_SHe(data=DISP_final,MARGIN.THRES = 3)
+class(test1)
+head(test1$L)  
+head(test1$data)    
+test1$N
+str(test1)
+
+DISP_final1 <- dplyr::summarise(group_by(DISP,ing,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
+test_table <- as.PhViD(DISP_final1, MARGIN.THRES = 3) 
+bayes_result$INPUT.PARAM
+head(bayes_table$L)  
+head(bayes_table$data)     
+bayes_table$N
+str(test_table)
+
+
+bayes_result <- BCPNN(test1, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
+bayes_result$INPUT.PARAM
+head(bayes_result$ALLSIGNALS)  
+head(bayes_result$SIGNALS)     
+bayes_result$NB.SIGNALS
+
+bayes_result1 <- BCPNN(test_table, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
+bayes_result1$INPUT.PARAM
+head(bayes_result1$ALLSIGNALS)  
+head(bayes_result1$SIGNALS)     
+bayes_result1$NB.SIGNALS
 ########################################################################################################################################
+
 ################################################ Disproportionality analysis (old) using BCPNN ###############################################
 current_date_range <- c(ymd("20140101", ymd("20140331")))
 
@@ -469,7 +521,7 @@ as.PhVid_SHe1 <- function(data){
 }
 
 ######################################## as.PhVid_SHe function for margin.thres > 1 #################################################
-MARGIN.THRES <- 5
+MARGIN.THRES <- 3
 data <- DISP_final
 
 as.PhVid_SHe <- function(data, MARGIN.THRES){
@@ -528,10 +580,11 @@ head(test$L)
 head(test$data)    
 test$N
 
-test1 <- as.PhVid_SHe(data=DISP_final,MARGIN.THRES = 3)
+test1 <- as.PhVid_SHe(data=DISP_final,MARGIN.THRES = 1)
 head(test1$L)  
 head(test1$data)    
 test1$N
+str(test1)
 
 DISP_final1 <- dplyr::summarise(group_by(DISP,ing,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
 test_table <- as.PhViD(DISP_final1, MARGIN.THRES = 1) 
@@ -539,9 +592,10 @@ bayes_result$INPUT.PARAM
 head(bayes_table$L)  
 head(bayes_table$data)     
 bayes_table$N
+str(test_table)
 
 
-bayes_result <- BCPNN(bayes_table, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
+bayes_result <- BCPNN(test1, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
 bayes_result$INPUT.PARAM
 head(bayes_result$ALLSIGNALS)  
 head(bayes_result$SIGNALS)     
@@ -556,13 +610,13 @@ bayes_result1$NB.SIGNALS
 
 ############### test for inconsistency with orginal as.PhVid ####################
 data <- DISP_final
-n1._df_name <- aggregate(count~ACTIVE_INGREDIENT_NAME,data,sum)  # 5143*2
-n1._df_name_final <- n1._df_name %>% filter(count >= MARGIN.THRES)%>% select(ACTIVE_INGREDIENT_NAME, count)%>% as.data.table(n=-1) # 4273*2
+n1._df_name <- aggregate(count~ing,data,sum)  # 5143*2
+n1._df_name_final <- n1._df_name %>% filter(count >= MARGIN.THRES)%>% select(ing, count)%>% as.data.table(n=-1) # 4273*2
 dim(n1._df_name_final)
 head(n1._df_name_final)
 head(n1._df_name)
-DISP_final[DISP_final$ACTIVE_INGREDIENT_NAME == "sclera"]
-DISP_final[DISP_final$PT_NAME_ENG == "Intention tremor"]
+DISP_final1[DISP_final1$ing == "tenecteplase"]
+DISP_final1[DISP_final1$PT_NAME_ENG == "Intention tremor"]
 
 
 n.1_df_name <- aggregate(count~PT_NAME_ENG,data,sum) # 3116*2
@@ -572,13 +626,13 @@ dim(n.1_df_name_final)
 
 df <- data %>% rename(n11 = count) # 300398
 dim(df)
-df1 <- df[(df$ACTIVE_INGREDIENT_NAME %in% n1._df_name_final$ACTIVE_INGREDIENT_NAME),] # 299129
+df1 <- df[(df$ing %in% n1._df_name_final$ing),] # 299129
 dim(df1)
 head(df1)
 data_final <- df1[(df1$PT_NAME_ENG %in% n.1_df_name_final$PT_NAME_ENG),] # 298698
 dim(data_final)
 
-L <- data.frame(bayes_table$L)
-test_df <- data_final[!(data_final$ACTIVE_INGREDIENT_NAME %in% L$ACTIVE_INGREDIENT_NAME),] # tenecteplase
+L <- data.frame(test_table$L)
+test_df <- data_final[!(data_final$ing %in% L$ing),] # tenecteplase
 test_df1 <- data_final[!(data_final$PT_NAME_ENG %in% L$PT_NAME_ENG),]
 
