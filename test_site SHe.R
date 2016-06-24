@@ -14,31 +14,8 @@ current_date_range <- c(ymd("19650101", ymd("20160527")))
 
 
 ####################################################################################################################
-# RAMICADE vs. HUMIRA ([CV_Shiny_DO SHe.R#485], <-.data.frame: replacement has 1 row, data has 0) SOLVED!!!!
-# DIGOXIN: [CV_Shiny_DO SHe.R#492], Error in if: missing value where TRUE/FALSE needed SOLVED!!!
-
-
-observe({
-  updateSelectizeInput(session, )
-  })
-
-
 
 ####################################################################################################################
-head(cv_reactions)
-cv_reactions <-cv_reactions %>% as.data.frame(n=-1)
-table(cv_reactions$SOC_NAME_ENG)
-
-a <- cv_reactions %>% filter(SOC_NAME_ENG == "Eye disorders") %>% select(REPORT_ID, PT_NAME_ENG, SOC_NAME_ENG) %>% collect()
-b <- dplyr::summarise(group_by(a,PT_NAME_ENG),count=n_distinct(REPORT_ID))
-head(b)
-
-date <- as.POSIXct("2015-12-01")
-date1 <- floor_date(date,"year")
-date2 <- format(date, "%Y")
-
-
-
 current_ingd <- "infliximab"
 current_year <- "2015"
 
@@ -47,15 +24,130 @@ cv_reports <- tbl(hcopen, "cv_reports")
 cv_drug_product_ingredients <-  tbl(hcopen, "cv_drug_product_ingredients")
 cv_report_drug <- tbl(hcopen,"cv_report_drug")
 cv_reactions <- tbl(hcopen,"cv_reactions") 
+cv_subtances <- tbl(hcopen, "cv_substances")
+cv_drug_rxn <- tbl(hcopen, "cv_drug_rxn")
 ####################################################################################################################
 
 current_ingd <- "acetaminophen"
 current_year <- "2015"
 
+################################################ Disproportionality analysis (new) using BCPNN ###############################################
+head(cv_subtances)
+head(cv_drug_rxn)
+str(cv_drug_rxn)
 
+cv_drug_rxn <- cv_drug_rxn %>% as.data.table(n=-1)
+
+quarters <- levels(DISP$quarter)
+head(quarters)
+
+current_quarter <- 2000.2
+DISP <- cv_drug_rxn %>% filter(quarter == current_quater) 
+
+cv_drug_rxn$quarter<- as.factor(as.character(cv_drug_rxn$quarter))
+
+DISP <- cv_drug_rxn %>% dplyr::group_by(cv_drug_rxn, quarter)
+head(DISP)
+tail(DISP)
+
+DISP_final <- dplyr::summarise(group_by(DISP,quarter,ing,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
+head(DISP_final)
+
+
+quarters <- levels(DISP$quarter)
+
+quarters <- c("1965.1","1965.2")
+
+DISP_table <- vector(mode = "list")
+bayes_table <- vector(mode = "list")
+bayes_result <- vector(mode = "list")
+for(i in 1:length(quarters)){
+  DISP_table[i]<-list(DISP_final %>% filter(quarter == quarters[i]))
+  bayes_table[i] <- list(as.PhVid_SHe(data=as.data.frame(DISP_table[i]),MARGIN.THRES = 1))
+  bayes_result[i] <- BCPNN(bayes_table[i], RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
+}
+str(DISP_table)
+head(DISP_table)
+head(DISP_table[1])
+
+str(bayes_table)
+head(bayes_table)
+head(bayes_table[[1]])
+
+a <- bayes_table[1]
+str(a)
+class(a)
+
+b<- BCPNN(a, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
+
+bayes_table<- DISP_final  %>% group_by(quarters) %>% do(
+  as.PhVid_SHe(data=DISP_final,MARGIN.THRES = 1)
+)
+head(bayes_table)
+head(bayes_table$L)  
+head(bayes_table$data)     
+bayes_table$N
+
+bayes_result <- BCPNN(bayes_table, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
+bayes_result$INPUT.PARAM
+head(bayes_result$ALLSIGNALS)  
+head(bayes_result$SIGNALS)     
+bayes_result$NB.SIGNALS
+
+######################################## as.PhVid_SHe function for margin.thres > 1 #################################################
+MARGIN.THRES <- 5
+data <- DISP_final
+data <- as.data.frame(DISP_table[1])
+
+as.PhVid_SHe <- function(data, MARGIN.THRES){
+  RES2 <- vector(mode = "list")
+  
+  # margin.thres
+  if(MARGIN.THRES>1){
+    n1._df_name <- aggregate(count~ing,data,sum)  # 5143*2
+    n1._df_name_final <- n1._df_name %>% filter(count >= MARGIN.THRES)%>% select(ing)%>% as.data.table(n=-1) # 4273*2
+    
+    n.1_df_name <- aggregate(count~PT_NAME_ENG,data,sum) # 3116*2
+    n.1_df_name_final <- n.1_df_name %>% filter(count >= MARGIN.THRES)%>% select(PT_NAME_ENG)%>% as.data.table(n=-1) #2840*2
+    
+    df <- data %>% rename(n11 = count) # 300398
+    df1 <- df[(df$ing %in% n1._df_name_final$ing),] # 299129
+    data_final <- df1[(df1$PT_NAME_ENG %in% n.1_df_name_final$PT_NAME_ENG),] # 298698
+    
+    n1._df <- aggregate(n11~ing,data_final,sum) %>% rename(n1. = n11) %>% as.data.table(n=-1) 
+    n.1_df <- aggregate(n11~PT_NAME_ENG,data_final,sum)%>% rename(n.1 = n11)%>% as.data.table(n=-1)
+    
+    output <- df %>% dplyr::left_join(n1._df) %>% filter(is.na(n1.) == FALSE)
+    output1 <- df %>% left_join(n.1_df)%>% filter(is.na(n.1) == FALSE)
+    
+    RES2$data <- output %>% left_join(output1)  %>% filter(is.na(n.1) == FALSE)%>% select(n11, n1.,n.1)
+    RES2$L <- data.frame(data_final %>% select(ing,PT_NAME_ENG))
+    RES2$N <- sum(data_final$n11)
+    
+  } else {
+    n1._df <- aggregate(count~ing,data,sum) %>% rename(n1. = count) %>% as.data.table(n=-1) #5143*2
+    n.1_df <- aggregate(count~PT_NAME_ENG,data,sum)%>% rename(n.1 = count)%>% as.data.table(n=-1) # 3116*2
+    
+    df <- data %>% rename(n11 = count)
+    output <- df %>% dplyr::left_join(n1._df) %>% filter(is.na(n1.) == FALSE)
+    output1 <- df %>% left_join(n.1_df)%>% filter(is.na(n.1) == FALSE)
+    
+    # RES$data as a dataframe
+    RES2$data <- output %>% left_join(output1)  %>% filter(is.na(n.1) == FALSE) %>% select(n11, n1.,n.1)
+    
+    # RES$N
+    RES2$N <- sum(df$n11)
+    
+    RES2$L <- data.frame(df %>% select(ing,PT_NAME_ENG))
+  }
+  return(RES2)
+}
+
+
+####################################################################################################################
 
 ########################################################################################################################################
-################################################ Disproportionality analysis using BCPNN ###############################################
+################################################ Disproportionality analysis (old) using BCPNN ###############################################
 current_date_range <- c(ymd("20140101", ymd("20140331")))
 
 library(dplyr)
@@ -100,7 +192,7 @@ BCPNN_signal <- function(current_date_range){
 
 BCPNN_signal(current_date_range=c(ymd("20140101", ymd("20140331"))))
 
-########################################################### Explorative analysis on BCPNN function #####################################################
+########################################################### Explorative analysis (old) on BCPNN function #####################################################
 
 str(bayes_result)
 summary(bayes_result)
@@ -170,12 +262,15 @@ write.csv(DISP_final, file = "test.csv")
 
 ####################################################################################################################
 
-################################################ Disproportionality analysis using PRR ###############################################
+################################################ Disproportionality analysis (old) using PRR ###############################################
 current_date_range <- c(ymd("20140101", ymd("20140601")))
 
 part1 <-cv_drug_product_ingredients %>% dplyr::select(DRUG_PRODUCT_ID,ACTIVE_INGREDIENT_NAME) %>% left_join(cv_report_drug) %>% 
-  dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% 
-  left_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) #%>% as.data.table(n=-1)
+  dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME) %>% filter(is.na(ACTIVE_INGREDIENT_NAME) == FALSE) %>% 
+  left_join(cv_reactions) %>% dplyr::select(REPORT_ID,ACTIVE_INGREDIENT_NAME, PT_NAME_ENG) %>% filter(is.na(PT_NAME_ENG) == FALSE) 
+  #%>% as.data.table(n=-1)
+
+part1[is.na(part1$PT_NAME_ENG) == TRUE,]
 
 part2 <- cv_reports  %>% 
   filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
@@ -273,30 +368,32 @@ size *2
 ######################################################################
 
 ####################################################################################################################
-ch <- gconnect("hyq9265@gmail.com", "")
 
-D <- c("D1","D2","D3","D3")
-AR<- c("AR1","AR2","AR3", "AR4")
-C <- c(3,4,5,6)
+
+D <- c("D1","D2","D2","D3","D3")
+AR<- c("AR1","AR1","AR2", "AR3","AR4")
+C <- c(3,4,5,6,7)
 df<- data.frame(D,AR,C, stringsAsFactors = FALSE)
+df
 
 test_table <- as.PhVid_SHe(df,MARGIN.THRES = 1)
 test_table$L
 test_table$data
 test_table$N
 
+as.PhViD
 
-as.PhVid_SHe <- function (DATA.FRAME, MARGIN.THRES = 1) {
+as.PhViD<- function (DATA.FRAME, MARGIN.THRES = 1) {
   #test
   DATA.FRAME <- df
-  MARGIN.THRES = 1
+  MARGIN.THRES = 3
   
-  data <- DATA.FRAME
+  data <- DISP_final
 
   # convert D, AR to FACTOR & convert count to DOUBLE 
-  data[, 1] <- as.factor(DATA.FRAME[, 1])
-  data[, 2] <- as.factor(DATA.FRAME[, 2])
-  data[, 3] <- as.double(DATA.FRAME[, 3])
+  data[, 1] <- as.factor(data[, 1])
+  data[, 2] <- as.factor(data[, 2])
+  data[, 3] <- as.double(data[, 3])
   
   # change count column name of DATA.FRAME to n11
   coln <- names(data)
@@ -345,17 +442,143 @@ as.PhVid_SHe <- function (DATA.FRAME, MARGIN.THRES = 1) {
 a<- RES$data
 a
 
-df
-libel.medoc <- as.character(df[,1])
-libel.effet <- as.character(df[,2])
+######################################### as.PhVid_SHe function for margin.thres = 1 #######################################################
+as.PhVid_SHe1 <- function(data){
+  RES1 <- vector(mode = "list")
+  
+  # compile RES1$L
+  RES1$L<- data.frame(data %>% select(ACTIVE_INGREDIENT_NAME,PT_NAME_ENG ))
+  
+  # margin.thres =1
+  n1._df <- aggregate(count~ACTIVE_INGREDIENT_NAME,data,sum) %>% rename(n1. = count) %>% as.data.table(n=-1) #5143*2
+  n.1_df <- aggregate(count~PT_NAME_ENG,data,sum)%>% rename(n.1 = count)%>% as.data.table(n=-1) # 3116*2
+  
+  results0 <- data %>% rename(n11 = count)
+  
+  results <- results0 %>% dplyr::left_join(n1._df) %>% filter(is.na(n1.) == FALSE)
+  
+  results1 <- results0 %>% left_join(n.1_df)%>% filter(is.na(n.1) == FALSE)
+  
+  # RES$data as a dataframe
+  RES1$data <- results %>% left_join(results1)  %>% filter(is.na(n.1) == FALSE)
+
+  # RES$N
+  RES1$N <- sum(data$count)
+  
+  return(RES1)
+}
+
+######################################## as.PhVid_SHe function for margin.thres > 1 #################################################
+MARGIN.THRES <- 5
+data <- DISP_final
+
+as.PhVid_SHe <- function(data, MARGIN.THRES){
+  RES2 <- vector(mode = "list")
+  
+  # margin.thres
+  if(MARGIN.THRES>1){
+    n1._df_name <- aggregate(count~ing,data,sum)  # 5143*2
+    n1._df_name_final <- n1._df_name %>% filter(count >= MARGIN.THRES)%>% select(ing)%>% as.data.table(n=-1) # 4273*2
+    
+    n.1_df_name <- aggregate(count~PT_NAME_ENG,data,sum) # 3116*2
+    n.1_df_name_final <- n.1_df_name %>% filter(count >= MARGIN.THRES)%>% select(PT_NAME_ENG)%>% as.data.table(n=-1) #2840*2
+    
+    df <- data %>% rename(n11 = count) # 300398
+    df1 <- df[(df$ing %in% n1._df_name_final$ing),] # 299129
+    data_final <- df1[(df1$PT_NAME_ENG %in% n.1_df_name_final$PT_NAME_ENG),] # 298698
+
+    n1._df <- aggregate(n11~ing,data_final,sum) %>% rename(n1. = n11) %>% as.data.table(n=-1) 
+    n.1_df <- aggregate(n11~PT_NAME_ENG,data_final,sum)%>% rename(n.1 = n11)%>% as.data.table(n=-1)
+    
+    output <- df %>% dplyr::left_join(n1._df) %>% filter(is.na(n1.) == FALSE)
+    output1 <- df %>% left_join(n.1_df)%>% filter(is.na(n.1) == FALSE)
+    
+    RES2$data <- output %>% left_join(output1)  %>% filter(is.na(n.1) == FALSE)%>% select(n11, n1.,n.1)
+    RES2$L <- data.frame(data_final %>% select(ing,PT_NAME_ENG))
+    RES2$N <- sum(data_final$n11)
+    
+  } else {
+    n1._df <- aggregate(count~ing,data,sum) %>% rename(n1. = count) %>% as.data.table(n=-1) #5143*2
+    n.1_df <- aggregate(count~PT_NAME_ENG,data,sum)%>% rename(n.1 = count)%>% as.data.table(n=-1) # 3116*2
+    
+    df <- data %>% rename(n11 = count)
+    output <- df %>% dplyr::left_join(n1._df) %>% filter(is.na(n1.) == FALSE)
+    ouput1 <- df %>% left_join(n.1_df)%>% filter(is.na(n.1) == FALSE)
+    
+    # RES$data as a dataframe
+    RES2$data <- output %>% left_join(output1)  %>% filter(is.na(n.1) == FALSE) %>% select(n11, n1.,n.1)
+    
+    # RES$N
+    RES2$N <- sum(df$n11)
+    
+    RES2$L <- data.frame(output %>% left_join(output1)  %>% filter(is.na(n.1) == FALSE) %>% select(ing,PT_NAME_ENG))
+  }
+  return(RES2)
+}
 
 
-n1._df <- aggregate(C~D,df,sum) 
-n1._df <- n1._df %>% mutate(index = 1:nrow(n1._df))
+####################################################################################################################
+bayes_table1 <- as.PhVid_SHe(DISP_final,MARGIN.THRES = 3)
+bayes_table1$N
+bayes_results <- BCPNN(RES1, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
 
-n.1_df <- aggregate(C~AR,df,sum)
-n.1_df <- n.1_df %>% mutate(index = 1: nrow(n.1_df))
 
-results <- n1._df %>% full_join(n.1_df, by="index")
+test <- as.PhVid_SHe1(data=DISP_final)
+head(test$L)  
+head(test$data)    
+test$N
 
-results <- cbind(libel.medoc,libel.effet,df$C,n1._df,n.1_df)
+test1 <- as.PhVid_SHe(data=DISP_final,MARGIN.THRES = 3)
+head(test1$L)  
+head(test1$data)    
+test1$N
+
+DISP_final1 <- dplyr::summarise(group_by(DISP,ing,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
+test_table <- as.PhViD(DISP_final1, MARGIN.THRES = 1) 
+bayes_result$INPUT.PARAM
+head(bayes_table$L)  
+head(bayes_table$data)     
+bayes_table$N
+
+
+bayes_result <- BCPNN(bayes_table, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
+bayes_result$INPUT.PARAM
+head(bayes_result$ALLSIGNALS)  
+head(bayes_result$SIGNALS)     
+bayes_result$NB.SIGNALS
+
+bayes_result1 <- BCPNN(test1, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
+bayes_result1$INPUT.PARAM
+head(bayes_result1$ALLSIGNALS)  
+head(bayes_result1$SIGNALS)     
+bayes_result1$NB.SIGNALS
+
+
+############### test for inconsistency with orginal as.PhVid ####################
+data <- DISP_final
+n1._df_name <- aggregate(count~ACTIVE_INGREDIENT_NAME,data,sum)  # 5143*2
+n1._df_name_final <- n1._df_name %>% filter(count >= MARGIN.THRES)%>% select(ACTIVE_INGREDIENT_NAME, count)%>% as.data.table(n=-1) # 4273*2
+dim(n1._df_name_final)
+head(n1._df_name_final)
+head(n1._df_name)
+DISP_final[DISP_final$ACTIVE_INGREDIENT_NAME == "sclera"]
+DISP_final[DISP_final$PT_NAME_ENG == "Intention tremor"]
+
+
+n.1_df_name <- aggregate(count~PT_NAME_ENG,data,sum) # 3116*2
+n.1_df_name_final <- n.1_df_name %>% filter(count >= MARGIN.THRES)%>% select(PT_NAME_ENG)%>% as.data.table(n=-1) #2840*2
+dim(n.1_df_name_final)
+
+
+df <- data %>% rename(n11 = count) # 300398
+dim(df)
+df1 <- df[(df$ACTIVE_INGREDIENT_NAME %in% n1._df_name_final$ACTIVE_INGREDIENT_NAME),] # 299129
+dim(df1)
+head(df1)
+data_final <- df1[(df1$PT_NAME_ENG %in% n.1_df_name_final$PT_NAME_ENG),] # 298698
+dim(data_final)
+
+L <- data.frame(bayes_table$L)
+test_df <- data_final[!(data_final$ACTIVE_INGREDIENT_NAME %in% L$ACTIVE_INGREDIENT_NAME),] # tenecteplase
+test_df1 <- data_final[!(data_final$PT_NAME_ENG %in% L$PT_NAME_ENG),]
+
