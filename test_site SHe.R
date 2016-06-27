@@ -39,24 +39,22 @@ str(cv_drug_rxn)
 cv_drug_rxn <- cv_drug_rxn %>% as.data.table(n=-1)
 # save(cv_drug_rxn, file = "cv_drug_rxn.RData")
 
-quarters <- levels(DISP$quarter)
-head(quarters)
-
 
 DISP <- cv_drug_rxn %>% dplyr::group_by(cv_drug_rxn, quarter)
 head(DISP)
 tail(DISP)
 
-DISP_final <- dplyr::summarise(group_by(DISP,quarter,ing,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
+DISP_final <- dplyr::summarise(group_by(DISP,quarter,ing,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.frame(n=-1)
 head(DISP_final)
 
 # all levels of quarters
+DISP$quarter <- as.factor(DISP$quarter)
 quarters <- levels(DISP$quarter)
 
 # create lists
 DISP_table <- vector(mode = "list") # frequency table filtered by quarter
 bayes_table <- vector(mode = "list") # as.PhVid_SHe for each quarter of frequency table
-bayes_result <- vector(mode = "list") # BCPNN or PRR on each bayes_table
+bayes_result <- vector(mode = "list") # BCPNN on each bayes_table
 bayes_result_final <- vector(mode = "list") # ALLSIGNALS of each bayes_result
 
 
@@ -64,9 +62,10 @@ for(i in 1:length(quarters)){
   DISP_table[i]<-list(DISP_final %>% filter(quarter == quarters[i]))
   bayes_table[i] <- list(as.PhVid_SHe(data=as.data.frame(DISP_table[i]),MARGIN.THRES = 1))
   bayes_result[i] <- list(BCPNN(bayes_table[[i]], RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE))
-  bayes_result_final[i] <- list(bayes_result[[i]]$ALLSIGNALS)
+  bayes_result_final[[paste("BCPNN - Quarter: ",quarters[i], sep="")]] <- list(bayes_result[[i]]$ALLSIGNALS)
 }
 
+#save(bayes_result_final, file = "bayes_result_BCPNN_final.RData")
 str(DISP_table)
 head(DISP_table[1])
 
@@ -76,7 +75,8 @@ head(bayes_table[[1]]$data)
 str(bayes_result)
 
 str(bayes_result_final)
-head(bayes_result_final[[100]])
+
+head(bayes_result_final[[200]])
 
 
 
@@ -102,14 +102,64 @@ str(bayes_result1)
 
 str(bayes_result_final1)
 
+# benchmark as.PhVid_SHe
+op <- microbenchmark(as.PhVid_SHe(data=DISP_final, MARGIN.THRES = 1),times=10L)
+boxplot(op)
+
+# benchmark as.PhViD
+DISP_final1 <- DISP_final %>% select(-quarter)
+op1 <- microbenchmark(as.PhViD(DATA.FRAME=DISP_final1, MARGIN.THRES = 1),times=10L)
+boxplot(op1)
+
+op_all <- op %>% full_join(op1)
+
+benchmark_boxplot <-ggplot(op_all, aes(x=expr, y=time, fill=expr))+geom_boxplot()
+benchmark_boxplot
+
+################################################ Disproportionality analysis (new) using PRR ###############################################
+DISP <- cv_drug_rxn %>% dplyr::group_by(cv_drug_rxn, quarter)%>% as.data.table(n=-1)
+head(DISP)
+tail(DISP)
+
+DISP_final <- dplyr::summarise(group_by(DISP,quarter,ing,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.frame(n=-1)
+head(DISP_final)
+class(DISP_final$quarter)
+
+# all levels of quarters
+DISP$quarter <- as.factor(DISP$quarter)
+quarters <- levels(DISP$quarter)
+class(quarters)
+quarters[1]
+
+# create lists
+DISP_PRR_table <- vector(mode = "list") # frequency table filtered by quarter
+bayes_PRR_table <- vector(mode = "list") # as.PhVid_SHe for each quarter of frequency table
+bayes_PRR_result <- vector(mode = "list") # PRR on each bayes_table
+bayes_PRR_result_final <- vector(mode = "list") # ALLSIGNALS of each bayes_result
+
+
+for(i in 1:length(quarters)){
+  DISP_PRR_table[i]<-list(DISP_final %>% filter(quarter == quarters[i]))
+  bayes_PRR_table[i] <- list(as.PhVid_SHe(data=as.data.frame(DISP_PRR_table[i]),MARGIN.THRES = 1))
+  bayes_PRR_result[i] <- list(PRR(bayes_PRR_table[[i]], RR0=1, MIN.n11 = 1, DECISION = 3, DECISION.THRES = 0.05, RANKSTAT = 2))
+  bayes_PRR_result_final[[paste("PRR - Quarter: ",quarters[i], sep="")]] <- list(bayes_PRR_result[[i]]$ALLSIGNALS)
+}
 
 
 
+#save(bayes_PRR_result_final, file = "bayes_result_PRR_final.RData")
+str(DISP_PRR_table)
+head(DISP_PRR_table[1])
 
-str(a)
-bayes_table<- DISP_final  %>% group_by(quarters) %>% do(
-  as.PhVid_SHe(data=DISP_final,MARGIN.THRES = 1)
-)
+str(bayes_PRR_table)
+head(bayes_PRR_table[[1]]$data)
+
+str(bayes_PRR_result)
+
+str(bayes_PRR_result_final)
+names(bayes_PRR_result_final)
+
+head(bayes_PRR_result_final[[200]])
 
 
 ######################################## as.PhVid_SHe function for margin.thres > 1 #################################################
@@ -117,23 +167,23 @@ MARGIN.THRES <- 5
 data <- DISP_final
 data <- as.data.frame(DISP_table[1])
 
-as.PhVid_SHe <- function(data, MARGIN.THRES){
+as.PhVid_SHe <- function(data, MARGIN.THRES=1){
   RES2 <- vector(mode = "list")
   
   # margin.thres
   if(MARGIN.THRES>1){
     n1._df_name <- aggregate(count~ing,data,sum)  # 5143*2
-    n1._df_name_final <- n1._df_name %>% filter(count >= MARGIN.THRES)%>% select(ing)%>% as.data.table(n=-1) # 4273*2
+    n1._df_name_final <- n1._df_name %>% filter(count >= MARGIN.THRES)%>% dplyr::select(ing)%>% as.data.table(n=-1) # 4273*2
     
     n.1_df_name <- aggregate(count~PT_NAME_ENG,data,sum) # 3116*2
-    n.1_df_name_final <- n.1_df_name %>% filter(count >= MARGIN.THRES)%>% select(PT_NAME_ENG)%>% as.data.table(n=-1) #2840*2
+    n.1_df_name_final <- n.1_df_name %>% filter(count >= MARGIN.THRES)%>% dplyr::select(PT_NAME_ENG)%>% as.data.table(n=-1) #2840*2
     
-    df <- data %>% rename(n11 = count) %>% select(-quarter) # 300398
+    df <- data %>% dplyr::rename(n11 = count) %>% dplyr::select(-quarter) # 300398
     df1 <- df[(df$ing %in% n1._df_name_final$ing),] # 299129
     data_final <- df1[(df1$PT_NAME_ENG %in% n.1_df_name_final$PT_NAME_ENG),] # 298698
     
-    n1._df <- aggregate(n11~ing,data_final,sum) %>% rename(n1. = n11) %>% as.data.table(n=-1) 
-    n.1_df <- aggregate(n11~PT_NAME_ENG,data_final,sum)%>% rename(n.1 = n11)%>% as.data.table(n=-1)
+    n1._df <- aggregate(n11~ing,data_final,sum) %>% dplyr::rename(n1. = n11) %>% as.data.table(n=-1) 
+    n.1_df <- aggregate(n11~PT_NAME_ENG,data_final,sum)%>% dplyr::rename(n.1 = n11)%>% as.data.table(n=-1)
     
     output <- df %>% dplyr::left_join(n1._df) %>% filter(is.na(n1.) == FALSE)
     output1 <- df %>% left_join(n.1_df)%>% filter(is.na(n.1) == FALSE)
@@ -143,20 +193,20 @@ as.PhVid_SHe <- function(data, MARGIN.THRES){
     RES2$N <- sum(data_final$n11)
     
   } else {
-    n1._df <- aggregate(count~ing,data,sum) %>% rename(n1. = count) %>% as.data.table(n=-1) #5143*2
-    n.1_df <- aggregate(count~PT_NAME_ENG,data,sum)%>% rename(n.1 = count)%>% as.data.table(n=-1) # 3116*2
+    n1._df <- aggregate(count~ing,data,sum)  %>% dplyr::rename(n1. = count) %>% as.data.table(n=-1)#5143*2
+    n.1_df <- aggregate(count~PT_NAME_ENG,data,sum)%>% dplyr::rename(n.1 = count)%>% as.data.table(n=-1) # 3116*2
     
-    df <- data %>% rename(n11 = count) %>% select(-quarter)
+    df <- data %>% dplyr::rename(n11 = count) %>% dplyr::select(-quarter)
     output <- df %>% dplyr::left_join(n1._df) %>% filter(is.na(n1.) == FALSE)
     output1 <- df %>% left_join(n.1_df)%>% filter(is.na(n.1) == FALSE)
     
     # RES$data as a dataframe
-    RES2$data <- output %>% left_join(output1)  %>% filter(is.na(n.1) == FALSE) %>% select(n11, n1.,n.1)
+    RES2$data <- output %>% left_join(output1)  %>% filter(is.na(n.1) == FALSE) %>% dplyr::select(n11, n1.,n.1)
     
     # RES$N
     RES2$N <- sum(df$n11)
     
-    RES2$L <- data.frame(output %>% left_join(output1)  %>% filter(is.na(n.1) == FALSE) %>% select(ing,PT_NAME_ENG))
+    RES2$L <- data.frame(output %>% left_join(output1)  %>% filter(is.na(n.1) == FALSE) %>% dplyr::select(ing,PT_NAME_ENG))
   }
   return(RES2)
 }
