@@ -1,30 +1,39 @@
 ############# check for orginal dataset #############
-a <- as.numeric(levels(as.factor(cv_reactions$REPORT_ID))) %>% as.data.table(n=-1) # levels of REPORT_ID in cv_reactions
-head(a)
-a1 <- cv_drug_rxn[is.na(cv_drug_rxn$PT_NAME_ENG)==TRUE,]$REPORT_ID%>% as.data.table(n=-1) # levels of REPORT_ID in cv_drug_rxn
-head(a1)
-
-a2 <- a1$. %in% a$. 
-table(a2) # 652 report_id in cv_drug_rxn are not in cv_reactions
-
 cv_reactions <- cv_reactions %>% as.data.table(n=-1)
-cv_reactions[cv_reactions$REPORT_ID == 89,]
+
 
 cv_report_drug <-cv_report_drug %>% as.data.table(n=-1)
 cv_reports <-cv_reports %>% as.data.table(n=-1)
 
-b <- as.numeric(levels(as.factor(cv_report_drug$REPORT_ID))) %>% as.data.table(n=-1)# levels of REPORT_ID in cv_report_drug
+a <- as.numeric(levels(as.factor(cv_reactions$REPORT_ID))) %>% as.data.table(n=-1) # levels of REPORT_ID in cv_reactions: 440722
+head(a)
+a1 <- cv_drug_rxn[is.na(cv_drug_rxn$PT_NAME_ENG)==TRUE,]$REPORT_ID%>% distinct() %>% as.data.table(n=-1) # number of na in PT_NAME_END in cv_drug_rxn: 652
+a1 <- unique(a1) %>% as.data.table(n=-1) # 520 reports that are in cv_drug_rxn but not in cv_reactions
+head(a1) 
+a1 # REPORT_ID of reports that are in cv_drug_rxn but not in cv_reactions
+
+a2 <- a1$. %in% a$. 
+table(a2) # 520 report_id in cv_drug_rxn are not in cv_reactions
+
+
+b <- as.numeric(levels(as.factor(cv_report_drug$REPORT_ID))) %>% as.data.table(n=-1)# levels of REPORT_ID in cv_report_drug: 441294
 b2 <- b$. %in% a$.
-table(b2)  # 627 FALSE: 637 report_id in cv_report_drug are NOT in cv_reactions
-b3 <- grep("FALSE",b2 )
+table(b2)  # 627 FALSE: 627 report_id in cv_report_drug are NOT in cv_reactions
+b3 <- grep("FALSE",b2 ) # index of the reports in cv_report_drug that missing in cv_reactions but presented in cv_report_drug
 b3
-c <- as.numeric(levels(as.factor(cv_reports$REPORT_ID))) %>% as.data.table(n=-1)# levels of REPORT_ID in cv_reports
+
+ID_NA_b3 <- b[b3]
+ID_NA_b3 # 627 REPORT_ID of reports that are in cv_report_drug but not in cv_reactions
+
+c <- as.numeric(levels(as.factor(cv_reports$REPORT_ID))) %>% as.data.table(n=-1)# levels of REPORT_ID in cv_reports:441359
 c2 <- c$. %in% a$.
 table(c2) # 637 FALSE: 637 report_id in cv_reports are NOT in cv_reactions
+c3 <- grep("FALSE", c2) # index of the reports in cv_reports that missing in cv_reactions but presented in cv_reports
 
-
-
-
+ID_NA_c3 <- c[c3]
+ID_NA_c3 # 637 REPORT_ID of reports that are in cv_reports but not in cv_reactions
+cv_reactions[cv_reactions$REPORT_ID == 86,]
+cv_reports[cv_reports$REPORT_ID == 86,]
 
 ################################################ Disproportionality analysis (new) using BCPNN ###############################################
 head(cv_subtances)
@@ -133,7 +142,7 @@ for(i in 1:length(quarters)){
   #bayes_PRR_result_final[[paste("PRR - Quarter: ",quarters[i], sep="")]] <- list(bayes_PRR_result[[i]]$ALLSIGNALS)
 }
 
-bayes_PRR_result[1] <- list(PRR(bayes_PRR_table[[1]], RR0=1, MIN.n11 = 3, DECISION = 3, DECISION.THRES = 0.05, RANKSTAT = 2))
+bayes_PRR_result[1]<- PRR(bayes_PRR_table[[1]], RR0=1, MIN.n11 = 3, DECISION = 3, DECISION.THRES = 0.05, RANKSTAT = 2)
 
 #save(bayes_PRR_result_final, file = "bayes_result_PRR_final.RData")
 str(DISP_PRR_table)
@@ -219,8 +228,8 @@ as.PhVid_SHe <- function(data, MARGIN.THRES=1){
     output <- df %>% dplyr::left_join(n1._df) %>% filter(is.na(n1.) == FALSE)
     output1 <- df %>% left_join(n.1_df)%>% filter(is.na(n.1) == FALSE)
     
-    RES2$data <- output %>% left_join(output1)  %>% distinct(ing, PT_NAME_ENG)%>% select(n11, n1.,n.1)
-    
+    RES2$data <- output %>% left_join(output1)  %>% distinct(ing, PT_NAME_ENG, .keep_all=TRUE)%>% select(n11, n1.,n.1)
+  
     RES2$L <- data.frame(data_final %>% select(ing,PT_NAME_ENG))
     RES2$N <- sum(data_final$n11)
     
