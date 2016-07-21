@@ -597,7 +597,7 @@ server <- function(input, output) {
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
       dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
     
-    DISP_final <- dplyr::summarise(group_by(semi_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
+    DISP_final <- dplyr::summarise(group_by(semi_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table()
    
     bayes_table <- as.PhViD(DISP_final, MARGIN.THRES = 1) 
     bayes_result <- BCPNN(bayes_table, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
@@ -620,7 +620,7 @@ server <- function(input, output) {
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
       dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
     
-    DISP_final <- dplyr::summarise(group_by(semi_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
+    DISP_final <- dplyr::summarise(group_by(semi_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table()
     
     bayes_table_PRR <- as.PhViD(DISP_final, MARGIN.THRES = 1) 
     

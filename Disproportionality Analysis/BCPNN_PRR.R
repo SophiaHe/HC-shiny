@@ -279,7 +279,13 @@ save(bayes_ROR_result_all, file="bayes_ROR_result_all0714.RData")
 ################################################ Disproportionality analysis (new) using Gamma Poisson Shrinkage(GPS) ###############################################
 #	propensity score matching
 
+# write table to database
+testconnect <- dbConnect(PostgreSQL(),host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+dbWriteTable(testconnect, "cv_bcpnn_160712", bayes_result_all)
+dbWriteTable(testconnect, "cv_prr_160713", bayes_PRR_result_all)
+dbWriteTable(testconnect, "cv_ror_160714", bayes_ROR_result_all)
 
+dbRemoveTable(testconnect, "test")
 
 
 
