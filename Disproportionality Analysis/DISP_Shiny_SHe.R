@@ -16,55 +16,43 @@ library(utils)
 library(dplyr)
 
 hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
-cv_prr <- tbl(hcopen, "cv_prr_160713") 
-cv_bcpnn <- tbl(hcopen, "cv_bcpnn")
-data <- bayes_PRR_result_all
-data[data$drug.code == "BENZOCAINE",]
+cv_prr <- tbl(hcopen, "cv_prr_160713") %>% as.data.frame()
+cv_bcpnn <- tbl(hcopen, "cv_bcpnn")%>% as.data.frame()
 
-head(bayes_result_all)
-quarter1 <- bayes_result_all[bayes_result_all$quarter == 1965.1,]
-quarter2 <- bayes_result_all[bayes_result_all$quarter == 1965.2,]
+#a <- cv_prr[order(cv_prr$PRR, decreasing = TRUE),]52199.00
+# THIAMAZOLE +CARDIAC FAILURE CONGESTIVE
 
-common <- merge(quarter1, quarter2, by= c("drug.code", "event.effect"))
+cv_prr[mapply(is.infinite, cv_prr)] <- 99999.99
+#cv_prr[cv_prr$PRR == Inf,]
+
+
+cv_prr <- cv_prr[order(cv_prr$.id,cv_prr$PRR, decreasing = TRUE),]
+cv_prr <- cv_prr[order(cv_prr$.id,decreasing = FALSE),]
+
+#cv_prr[cv_prr$drug.code == "THIAMAZOLE" & cv_prr$event.effect == "CARDIAC FAILURE CONGESTIVE",]
+
+
+#data <- bayes_PRR_result_all
+#data[data$drug.code == "BENZOCAINE",]
+
 # CHLORPROMAZINE Dysphagia
-#quarter1[quarter1$drug.code == "CHLORPROMAZINE" & quarter1$event.effect == "Dysphagia",]
+#quarter1[quarter1$drug.code == "CHLORPROMAZINE" & quarter1$event.effect == "Dysphagia",] 
 #quarter2[quarter2$drug.code == "CHLORPROMAZINE" & quarter2$event.effect == "Dysphagia",]
 
 #Oxycodone (ing= OXYCODONE HYDROCHLORIDE) -drug dependence
 # pioglitazone- bladder cance
 #captopril (check spelling) and coughing
+# PENICILLIN V + RASH
+# MEPERIDINE HYDROCHLORIDE + NAUSEA
 
-data[data$drug.code== "OXYCODONE HYDROCHLORIDE" & data$event.effect == "Drug dependence",]
-data[data$drug.code== "Oxycodone",]
-cv_report_drug[cv_report_drug$DRUGNAME == "OXYCODONE",]
-cv_drug_product_ingredients <-  cv_drug_product_ingredients %>% as.data.frame()
-cv_drug_product_ingredients[cv_drug_product_ingredients$DRUGNAME == "OXYCODONE",]
-oxy <- cv_drug_rxn[cv_drug_rxn$DRUGNAME == "OXYCODONE",]
-oxy$ing <- as.factor(oxy$ing)
-levels(oxy$ing)
 ########################### Functions ############################
-topdrug_func <- function(n){
-  cv_report_drug_dm <- cv_report_drug %>% dplyr::select(REPORT_ID, DRUGNAME)
-  
-  topdrugs <- dplyr::summarise(group_by(cv_report_drug_dm, DRUGNAME),count=n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
-  topdrugs_final <- topdrugs %>% arrange(desc(count)) %>% top_n(n) %>% dplyr::select(DRUGNAME)
-  topdrugs_final <- cv_prr %>%
-  return(topdrugs_final)
-} 
-
-toprxn_func <- function(n){
-  cv_reactions_dm <- cv_reactions %>% dplyr::select(REPORT_ID, PT_NAME_ENG)
-  
-  toprxn <- dplyr::summarise(group_by(cv_reactions_dm, PT_NAME_ENG),count=n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
-  toprxn_final <- toprxn %>% dplyr::arrange(desc(count)) %>% top_n(n) %>% dplyr::select(PT_NAME_ENG)
-  
-  return(toprxn_final)
-}
-
-topdrugs <- cv_prr %>% distinct(drug.code) %>% as.data.frame()
-toprxns <- cv_prr %>% distinct(event.effect) %>% as.data.frame()
 
 
+#topdrugs <- cv_prr %>% distinct(drug.code) %>% as.data.frame()
+#toprxns <- cv_prr %>% distinct(event.effect) %>% as.data.frame()
+
+topdrugs <- cv_prr %>% dplyr::distinct(drug.code) %>% dplyr::top_n(1000) %>% as.data.frame()
+toprxns <- cv_prr %>% semi_join(topdrugs) %>% dplyr::distinct(event.effect)%>% as.data.frame()
 
 
 ############ UI for DISP shiny ################
@@ -74,8 +62,8 @@ ui <- dashboardPage(
     sidebarMenu(
       menuItem("PRR", tabName = "prrdata", icon = icon("fa fa-cogs")),
       menuItem("BCPNN", tabName = "bcpnndata", icon = icon("fa fa-binoculars")),
-      menuItem("ROR", tabName = "rordata", icon = icon("fa fa-cogs")),
-      menuItem("Download", tabName = "downloaddata", icon = icon("fa fa-download")),
+      # menuItem("ROR", tabName = "rordata", icon = icon("fa fa-cogs")),
+      # menuItem("Download", tabName = "downloaddata", icon = icon("fa fa-download")),
       menuItem("About", tabName = "aboutinfo", icon = icon("info"))
     ),
     selectizeInput("search_generic", 
@@ -88,22 +76,22 @@ ui <- dashboardPage(
     
     selectizeInput("search_rxn", 
                    "Adverse Event Term",
-                   toprxns$event.effect,
+                   choices = NULL,
                    options = list(create = TRUE,
                                   placeholder = 'Please select an option below',
                                   onInitialize = I('function() { this.setValue(""); }'))),
-    dateRangeInput("searchDateRange",
-                   "Date Range",
-                   start = "1965-01-01",
-                   end = Sys.Date(),
-                   startview = "year",
-                   format = "yyyy-mm-dd"),
+    # dateRangeInput("searchDateRange",
+    #                "Date Range",
+    #                start = "1965-01-01",
+    #                end = Sys.Date(),
+    #                startview = "year",
+    #                format = "yyyy-mm-dd"),
     ##add more menu filter here
     
-    actionButton("searchButton", "Search"),
-    tags$br(),
-    tags$h3(strong("Current Search:")),
-    tableOutput("current_search")
+    actionButton("searchButton", "Search")
+    # tags$br(),
+    # tags$h3(strong("Current Search:")),
+    # tableOutput("current_search")
   ), 
   
   dashboardBody(
@@ -121,20 +109,20 @@ ui <- dashboardPage(
               fluidRow(
                 box(plotlyOutput(outputId = "prr_timeplot"),
                     tags$br(),
-                    tags$p("Reports by month from Canada Vigilance Adverse Reaction Online Database. 
-                 Trendline is a local non-parametric regression calculated with the LOESS model. 
-                 The shaded area is an approximation of the 95% confidence interval of the regression."),
+                    tags$p("Proportional Reporting Ratio (PRR) results by quarter. 
+                           Value of PRR indicates the signal strength of the particular Drug & Adverse_reaction pair. 
+                           Details can be found in DISP_about documentation"),
                     width = 12
-                ),
-                box(htmlOutput("sexplot"),
-                    tags$br(),
-                    tags$p("Unknown includes reports explicitly marked unknown and Not Specified includes reports with no gender information."),
-                    title = tags$h2("Gender"), width = 4),
-                box(htmlOutput("agegroupplot"),
-                    tags$br(),
-                    tags$p("Unknown includes reports with no age information."), 
-                    title = tags$h2("Age Groups"), width = 4),
-                box(plotlyOutput("agehist"), title = tags$h2("Age Histogram"), width = 4)
+                )
+                # box(htmlOutput("sexplot"),
+                #     tags$br(),
+                #     tags$p("Unknown includes reports explicitly marked unknown and Not Specified includes reports with no gender information."),
+                #     title = tags$h2("Gender"), width = 4),
+                # box(htmlOutput("agegroupplot"),
+                #     tags$br(),
+                #     tags$p("Unknown includes reports with no age information."), 
+                #     title = tags$h2("Age Groups"), width = 4),
+                # box(plotlyOutput("agehist"), title = tags$h2("Age Histogram"), width = 4)
               )
       ),
       
@@ -142,62 +130,62 @@ ui <- dashboardPage(
               fluidRow(
                 box(plotlyOutput(outputId = "bcpnn_timeplot"),
                     tags$br(),
-                    tags$p("Reports by month from Canada Vigilance Adverse Reaction Online Database. 
-                 Trendline is a local non-parametric regression calculated with the LOESS model. 
+                    tags$p("Reports by month from Canada Vigilance Adverse Reaction Online Database.
+                 Trendline is a local non-parametric regression calculated with the LOESS model.
                  The shaded area is an approximation of the 95% confidence interval of the regression."),
                     width = 12
-                ),
-                box(htmlOutput("reporterplot"), 
-                    tags$br(),
-                    tags$p("Qualification of the person who filed the report."),
-                    tags$p("Unknown is the number of reports without the primarysource.qualification field."),
-                    title = tags$h2("Reporter"), width = 4),
-                box(htmlOutput("seriousplot"), 
-                    tags$br(),
-                    tags$p("Reports marked as serious."),
-                    title = tags$h2("Serious reports"), width = 4),
-                box(htmlOutput("seriousreasonsplot"), 
-                    tags$br(),
-                    tags$p("Total sums to more than 100% because reports can be marked serious for multiple reasons."),
-                    title = tags$h2("Reasons for serious reports"), width = 4)
-              )
-      ),
-      
-      tabItem(tabName = "downloaddata",
-              fluidRow(
-                box(
-                  title = tags$h2("Download Dataset for Disproportionality Analysis"),
-                  dateRangeInput("searchDateRange_DISP",
-                                 "Date Range",
-                                 start = "1965-01-01",
-                                 end = Sys.Date(),
-                                 startview = "year",
-                                 format = "yyyy-mm-dd"),
-                  actionButton("searchDISPButton", "Search"),
-                  tableOutput("current_DISP_search"),
-                  tableOutput("current_DISP_size"),
-                  downloadButton('downloadData_DISP', 'Download')
-                ),
-                
-                box(
-                  tags$h2("Download Data Used for Current Searched Combination"),
-                  tags$h3("Please select an information category: "),
-                  selectizeInput("search_dataset_type",
-                                 "Information Category",
-                                 choices = c("Report Info", "Drug Info", "Reaction Info"),  
-                                 options = list(create = TRUE,
-                                                placeholder = 'Please select an option below',
-                                                onInitialize = I('function() { this.setValue(""); }'))),
-                  actionButton("search_report_type_dl","Go"),
-                  tableOutput("download_reports_type"),
-                  tableOutput("download_reports_size"),
-                  downloadButton('download_reports', 'Download')
                 )
-                # box(plotOutput("drugplot"),
-                #     tags$br(),
-                #     tags$p("This plot includes top_10 most-reported drugs with most-reported indication assocaiated with the seached drug."), width = 4)
+      #           # box(htmlOutput("reporterplot"), 
+      #           #     tags$br(),
+      #           #     tags$p("Qualification of the person who filed the report."),
+      #           #     tags$p("Unknown is the number of reports without the primarysource.qualification field."),
+      #           #     title = tags$h2("Reporter"), width = 4),
+      #           # box(htmlOutput("seriousplot"), 
+      #           #     tags$br(),
+      #           #     tags$p("Reports marked as serious."),
+      #           #     title = tags$h2("Serious reports"), width = 4),
+      #           # box(htmlOutput("seriousreasonsplot"), 
+      #           #     tags$br(),
+      #           #     tags$p("Total sums to more than 100% because reports can be marked serious for multiple reasons."),
+      #           #     title = tags$h2("Reasons for serious reports"), width = 4)
               )
       ),
+
+      # tabItem(tabName = "downloaddata",
+      #         fluidRow(
+      #           box(
+      #             title = tags$h2("Download Dataset for Disproportionality Analysis"),
+      #             dateRangeInput("searchDateRange_DISP",
+      #                            "Date Range",
+      #                            start = "1965-01-01",
+      #                            end = Sys.Date(),
+      #                            startview = "year",
+      #                            format = "yyyy-mm-dd"),
+      #             actionButton("searchDISPButton", "Search"),
+      #             tableOutput("current_DISP_search"),
+      #             tableOutput("current_DISP_size"),
+      #             downloadButton('downloadData_DISP', 'Download')
+      #           ),
+      #           
+      #           box(
+      #             tags$h2("Download Data Used for Current Searched Combination"),
+      #             tags$h3("Please select an information category: "),
+      #             selectizeInput("search_dataset_type",
+      #                            "Information Category",
+      #                            choices = c("Report Info", "Drug Info", "Reaction Info"),  
+      #                            options = list(create = TRUE,
+      #                                           placeholder = 'Please select an option below',
+      #                                           onInitialize = I('function() { this.setValue(""); }'))),
+      #             actionButton("search_report_type_dl","Go"),
+      #             tableOutput("download_reports_type"),
+      #             tableOutput("download_reports_size"),
+      #             downloadButton('download_reports', 'Download')
+      #           )
+      #           # box(plotOutput("drugplot"),
+      #           #     tags$br(),
+      #           #     tags$p("This plot includes top_10 most-reported drugs with most-reported indication assocaiated with the seached drug."), width = 4)
+      #         )
+      # ),
       tabItem(tabName = "aboutinfo",
               tags$h2("About the Shiny App"),
               tags$p("This is a prototyping platform to utilize open data sources (e.g. Canada Vigilance Adverse Reaction Online Database) 
@@ -235,39 +223,108 @@ ui <- dashboardPage(
 
 
 
-
+options(shiny.trace = TRUE, shiny.reactlog=TRUE)
+#drug_option = "SILVER NITRATE"
 
 ############################# Server of DISP Shiny #####################
-server <- function(input, output) {
-  observe({
-    drug_option <- input$search_generic
-    event_option <- cv_prr$event.effect[cv_prr$drug.code == drug_option]
+server <- function(input, output, session) {
+observe({
+  if(is.na(input$search_generic) == TRUE){
+    drug_option <- "OXYCODONE HYDROCHLORIDE"
+  } else {
+    drug_option <- input$search_generic 
+  }
+      
+    #event_option <- cv_prr$event.effect[cv_prr$drug.code == drug_option]
+    event_option <- cv_prr %>% dplyr::filter(drug.code == drug_option) %>% dplyr::distinct(event.effect) %>% dplyr::select(event.effect) #%>% arrange(event.effect)
     
-    updateSelectInput(session, "drug_option",
+    
+    updateSelectInput(session, "search_rxn",
                       label = "Select Adverse Event:",
-                      value = event_option)
+                      choices = event_option)
+})
+  
+  
+  cv_prr_tab <- reactive({
+    input$searchButton
+    #codes about dplyr::select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    current_drug <- isolate(ifelse(input$search_generic == "",
+                                    "OXYCODONE HYDROCHLORIDE",
+                                    input$search_generic))
+    current_rxn <- isolate(ifelse(input$search_rxn == "",
+                                  "DRUG DEPENDENCE",
+                                  input$search_rxn))
+    
+    #current_date_range <- isolate(input$searchDateRange)
+    #escape.POSIXt <- dplyr:::escape.Date
+    
+    
+    #prr_tab_df <- cv_prr[cv_prr$drug.code== current_drug & cv_prr$event.effect == current_rxn,]
+    
+    prr_tab_df <- cv_prr %>% filter(drug.code == current_drug, event.effect == current_rxn)
+      
+    return(prr_tab_df)
   })
+  
   
   
   output$prr_timeplot <- renderPlotly({
     
-    df <- data[data$drug.code== "OXYCODONE HYDROCHLORIDE" & data$event.effect == "DRUG DEPENDENCE",]
-    
-    #drug_selected <- data$DRUGNAME[1] 
-    
-    # data1 <- cv_search_tab()
-    # drug_selected <- data1$terms[1]
-    # #drug_selected <- "abc"
-    # 
-    # # specify the title of time plot based on reactive choice
-    # title <- ifelse(drug_selected == "Not Specified (All)", "All Drugs",drug_selected)
-    # plottitle <- paste("Strengh of Drug*AR pairs for", title)
+    df <- cv_prr_tab()
+    current_drug <- isolate(ifelse(input$search_generic == "",
+                                   "OXYCODONE HYDROCHLORIDE",
+                                   input$search_generic))
+    current_rxn <- isolate(ifelse(input$search_rxn == "",
+                                  "DRUG DEPENDENCE",
+                                  input$search_rxn))
+    plottitle <- paste("Non-Cumulative PRR Time Plot for:", current_drug, "&", current_rxn)
+
     p <- df %>%
       ggplot(aes(x = `.id`, y = PRR,group = 1)) +
       geom_line() + geom_point()  + 
-      ggtitle("plottitle1") + 
+      ggtitle(plottitle) + 
       xlab("Quarter") + 
-      ylab("Strength of Drug*AR Pairs") +
+      ylab("Non Cumulative PRR") +
+      theme_bw() +
+      theme(plot.title = element_text(lineheight=.8, face="bold"), axis.text.x = element_text(angle=90, vjust=1))
+    ggplotly(p)
+  })
+  
+  cv_bcpnn_tab <- reactive({
+    input$searchButton
+    #codes about dplyr::select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    current_drug <- isolate(ifelse(input$search_generic == "",
+                                   "OXYCODONE HYDROCHLORIDE",
+                                   input$search_generic))
+    current_rxn <- isolate(ifelse(input$search_rxn == "",
+                                  "DRUG DEPENDENCE",
+                                  input$search_rxn))
+    
+    #current_date_range <- isolate(input$searchDateRange)
+    #escape.POSIXt <- dplyr:::escape.Date
+    
+    bcpnn_tab_df <- cv_bcpnn %>% filter(drug.code == current_drug, event.effect == current_rxn)
+    
+    return(prr_tab_df)
+  })
+  
+  output$bcpnn_timeplot <- renderPloty({
+    df <- cv_bcpnn_tab()
+    
+    current_drug <- isolate(ifelse(input$search_generic == "",
+                                   "OXYCODONE HYDROCHLORIDE",
+                                   input$search_generic))
+    current_rxn <- isolate(ifelse(input$search_rxn == "",
+                                  "DRUG DEPENDENCE",
+                                  input$search_rxn))
+    plottitle <- paste("Non-Cumulative BCPNN Time Plot for:", current_drug, "&", current_rxn)
+    
+    p <- df %>%
+      ggplot(aes(x = `.id`, y = `Q_0.025.log.IC..`,group = 1)) +
+      geom_line() + geom_point()  + 
+      ggtitle(plottitle) + 
+      xlab("Quarter") + 
+      ylab("BCPNN") +
       theme_bw() +
       theme(plot.title = element_text(lineheight=.8, face="bold"), axis.text.x = element_text(angle=90, vjust=1))
     ggplotly(p)
