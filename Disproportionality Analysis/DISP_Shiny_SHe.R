@@ -17,33 +17,32 @@ library(dplyr)
 
 hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
 cv_prr <- tbl(hcopen, "cv_prr_160713") %>% as.data.frame()
-cv_bcpnn <- tbl(hcopen, "cv_bcpnn")%>% as.data.frame()
+cv_bcpnn <- tbl(hcopen, "cv_bcpnn_160712")%>% as.data.frame()
+cv_ror <- tbl(hcopen, "cv_ror_160714") %>% as.data.frame()
 
 #a <- cv_prr[order(cv_prr$PRR, decreasing = TRUE),]52199.00
 # THIAMAZOLE +CARDIAC FAILURE CONGESTIVE
 
 cv_prr[mapply(is.infinite, cv_prr)] <- 99999.99
-#cv_prr[cv_prr$PRR == Inf,]
-
 
 cv_prr <- cv_prr[order(cv_prr$.id,cv_prr$PRR, decreasing = TRUE),]
 cv_prr <- cv_prr[order(cv_prr$.id,decreasing = FALSE),]
 
-#cv_prr[cv_prr$drug.code == "THIAMAZOLE" & cv_prr$event.effect == "CARDIAC FAILURE CONGESTIVE",]
+# cv_ror <- cv_ror[order(cv_ror$.id, cv_ror$ROR, decreasing=TRUE),] 48613.000
+# cv_ror <- cv_ror[order(cv_ror$.id, decreasing = FALSE),]
+cv_ror[mapply(is.infinite, cv_ror)] <- 99999.99
 
 
-#data <- bayes_PRR_result_all
-#data[data$drug.code == "BENZOCAINE",]
-
-# CHLORPROMAZINE Dysphagia
-#quarter1[quarter1$drug.code == "CHLORPROMAZINE" & quarter1$event.effect == "Dysphagia",] 
-#quarter2[quarter2$drug.code == "CHLORPROMAZINE" & quarter2$event.effect == "Dysphagia",]
 
 #Oxycodone (ing= OXYCODONE HYDROCHLORIDE) -drug dependence
 # pioglitazone- bladder cance
 #captopril (check spelling) and coughing
 # PENICILLIN V + RASH
 # MEPERIDINE HYDROCHLORIDE + NAUSEA
+# IRON + BACK PAIN in BCPNN
+# NICOTINE + DIZZINESS in BCPNN
+# NICOTINE + CHEST PAIN in BCPNN
+# AMPICILLIN +RASH !!!!
 
 ########################### Functions ############################
 
@@ -51,10 +50,11 @@ cv_prr <- cv_prr[order(cv_prr$.id,decreasing = FALSE),]
 #topdrugs <- cv_prr %>% distinct(drug.code) %>% as.data.frame()
 #toprxns <- cv_prr %>% distinct(event.effect) %>% as.data.frame()
 
-topdrugs <- cv_prr %>% dplyr::distinct(drug.code) %>% dplyr::top_n(1000) %>% as.data.frame()
+topdrugs <- cv_prr %>% dplyr::distinct(drug.code)%>% dplyr::top_n(2000) %>% as.data.frame()
 toprxns <- cv_prr %>% semi_join(topdrugs) %>% dplyr::distinct(event.effect)%>% as.data.frame()
+quarters <- levels(as.factor(cv_prr$`.id`))
 
-
+#%>% dplyr::top_n(2000)
 ############ UI for DISP shiny ################
 ui <- dashboardPage(
   dashboardHeader(title = "CV Shiny"),
@@ -62,7 +62,7 @@ ui <- dashboardPage(
     sidebarMenu(
       menuItem("PRR", tabName = "prrdata", icon = icon("fa fa-cogs")),
       menuItem("BCPNN", tabName = "bcpnndata", icon = icon("fa fa-binoculars")),
-      # menuItem("ROR", tabName = "rordata", icon = icon("fa fa-cogs")),
+      menuItem("ROR", tabName = "rordata", icon = icon("fa fa-database")),
       # menuItem("Download", tabName = "downloaddata", icon = icon("fa fa-download")),
       menuItem("About", tabName = "aboutinfo", icon = icon("info"))
     ),
@@ -77,6 +77,21 @@ ui <- dashboardPage(
     selectizeInput("search_rxn", 
                    "Adverse Event Term",
                    choices = NULL,
+                   options = list(create = TRUE,
+                                  placeholder = 'Please select an option below',
+                                  onInitialize = I('function() { this.setValue(""); }'))),
+    selectizeInput("start_quarter", 
+                   "Display Results Starting From (Quarterly): ",
+                   quarters,
+                   #multiple = TRUE,
+                   options = list(create = TRUE,
+                                  placeholder = 'Please select an option below',
+                                  onInitialize = I('function() { this.setValue(""); }'))),
+    
+    selectizeInput("end_quarter", 
+                   "Display Results Ending at (Quarterly): ",
+                   quarters,
+                   #multiple = TRUE,
                    options = list(create = TRUE,
                                   placeholder = 'Please select an option below',
                                   onInitialize = I('function() { this.setValue(""); }'))),
@@ -95,24 +110,24 @@ ui <- dashboardPage(
   ), 
   
   dashboardBody(
-    # fluidRow(
-    #   box(plotlyOutput(outputId = "timeplot"),
-    #       tags$br(),
-    #       tags$p("Reports by month from Canada Vigilance Adverse Reaction Online Database. 
-    #              Trendline is a local non-parametric regression calculated with the LOESS model. 
-    #              The shaded area is an approximation of the 95% confidence interval of the regression."),
-    #       width = 12
-    #       )
-    #   ),
     tabItems(
       tabItem(tabName = "prrdata",
               fluidRow(
-                box(plotlyOutput(outputId = "prr_timeplot"),
-                    tags$br(),
-                    tags$p("Proportional Reporting Ratio (PRR) results by quarter. 
-                           Value of PRR indicates the signal strength of the particular Drug & Adverse_reaction pair. 
-                           Details can be found in DISP_about documentation"),
-                    width = 12
+                tabBox(
+                  tabPanel(
+                  "Time Plot",
+                  plotlyOutput(outputId = "prr_timeplot"),
+                  tags$br(),
+                  tags$p("Proportional Reporting Ratio (PRR) results by quarter. 
+                          Value of PRR indicates the signal strength of the particular Drug & Adverse_reaction pair. 
+                          Details can be found in DISP_about documentation"),
+                  width = 12), 
+                  
+                  tabPanel(
+                    "Word Cloud",
+                    
+                  )
+                width=12
                 )
                 # box(htmlOutput("sexplot"),
                 #     tags$br(),
@@ -151,6 +166,31 @@ ui <- dashboardPage(
               )
       ),
 
+      tabItem(tabName = "rordata",
+              fluidRow(
+                box(plotlyOutput(outputId = "ror_timeplot"),
+                    tags$br(),
+                    tags$p("Reports by month from Canada Vigilance Adverse Reaction Online Database.
+                 Trendline is a local non-parametric regression calculated with the LOESS model.
+                 The shaded area is an approximation of the 95% confidence interval of the regression."),
+                    width = 12
+                )
+                #           # box(htmlOutput("reporterplot"), 
+                #           #     tags$br(),
+                #           #     tags$p("Qualification of the person who filed the report."),
+                #           #     tags$p("Unknown is the number of reports without the primarysource.qualification field."),
+                #           #     title = tags$h2("Reporter"), width = 4),
+                #           # box(htmlOutput("seriousplot"), 
+                #           #     tags$br(),
+                #           #     tags$p("Reports marked as serious."),
+                #           #     title = tags$h2("Serious reports"), width = 4),
+                #           # box(htmlOutput("seriousreasonsplot"), 
+                #           #     tags$br(),
+                #           #     tags$p("Total sums to more than 100% because reports can be marked serious for multiple reasons."),
+                #           #     title = tags$h2("Reasons for serious reports"), width = 4)
+              )
+      ),
+      
       # tabItem(tabName = "downloaddata",
       #         fluidRow(
       #           box(
@@ -218,8 +258,9 @@ ui <- dashboardPage(
       )
     )
     ), 
+  
   skin = "blue"
-    )
+  )
 
 
 
@@ -228,23 +269,42 @@ options(shiny.trace = TRUE, shiny.reactlog=TRUE)
 
 ############################# Server of DISP Shiny #####################
 server <- function(input, output, session) {
-observe({
-  if(is.na(input$search_generic) == TRUE){
-    drug_option <- "OXYCODONE HYDROCHLORIDE"
-  } else {
-    drug_option <- input$search_generic 
-  }
+
+  # Design Reaction Dropdown Menu based on Drug selection
+  observe({
+    if(is.na(input$search_generic) == TRUE){
+      drug_option <- "OXYCODONE HYDROCHLORIDE"
+    } else {
+      drug_option <- input$search_generic 
+    }
+    
+    # if(is.na(input$search_rxn) == TRUE){
+    #   current_rxn <- "DRUG DEPENDENCE"
+    # } else {
+    #   current_rxn <- input$search_rxn
+    # }
+        
+      # adverse events available 
+      event_option <- cv_prr %>% dplyr::filter(drug.code == drug_option) %>% dplyr::distinct(event.effect) %>% dplyr::select(event.effect) #%>% arrange(event.effect)
       
-    #event_option <- cv_prr$event.effect[cv_prr$drug.code == drug_option]
-    event_option <- cv_prr %>% dplyr::filter(drug.code == drug_option) %>% dplyr::distinct(event.effect) %>% dplyr::select(event.effect) #%>% arrange(event.effect)
-    
-    
-    updateSelectInput(session, "search_rxn",
-                      label = "Select Adverse Event:",
-                      choices = event_option)
-})
+      updateSelectInput(session, "search_rxn",
+                        label = "Select Adverse Event:",
+                        choices = event_option)
+      
+      # quarters avaiable
+      quarter_option <- cv_prr %>% dplyr::filter(drug.code == drug_option) %>% dplyr::distinct(.id) %>% dplyr::select(.id)
+      
+      updateSelectInput(session, "start_quarter",
+                        label = "Display Results Starting From (Quarterly): ",
+                        choices = quarter_option)
+      
+      updateSelectInput(session, "end_quarter",
+                        label = "Display Results Ending At (Quarterly): ",
+                        choices = quarter_option)
+      
+  })
   
-  
+  # PRR tab 
   cv_prr_tab <- reactive({
     input$searchButton
     #codes about dplyr::select specific generic, brand and reaction name in search side bar, making sure they're not NA
@@ -254,20 +314,23 @@ observe({
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   "DRUG DEPENDENCE",
                                   input$search_rxn))
-    
-    #current_date_range <- isolate(input$searchDateRange)
-    #escape.POSIXt <- dplyr:::escape.Date
+    start_quarter <- isolate(ifelse(input$start_quarter == "",
+                                    "1965.1",
+                                    input$start_quarter))
+    end_quarter <- isolate(ifelse(input$end_quarter == "",
+                                  "2015.1",
+                                  input$end_quarter))
     
     
     #prr_tab_df <- cv_prr[cv_prr$drug.code== current_drug & cv_prr$event.effect == current_rxn,]
     
-    prr_tab_df <- cv_prr %>% filter(drug.code == current_drug, event.effect == current_rxn)
+    prr_tab_df <- cv_prr %>% filter(drug.code == current_drug, event.effect == current_rxn, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter))
       
     return(prr_tab_df)
   })
   
   
-  
+  # PRR Time Plot
   output$prr_timeplot <- renderPlotly({
     
     df <- cv_prr_tab()
@@ -290,6 +353,28 @@ observe({
     ggplotly(p)
   })
   
+
+  a <- cv_prr %>% filter(drug.code == "AMPICILLIN")
+  # PRR Event Wordcloud based on PRR
+  output$prr_event_wordcloud <- renderPlotly({
+    df <- cv_prr_tab()
+    current_drug <- isolate(ifelse(input$search_generic == "",
+                                   "OXYCODONE HYDROCHLORIDE",
+                                   input$search_generic))
+    start_quarter <- isolate(ifelse(input$start_quarter == "",
+                                    "1965.1",
+                                    input$start_quarter))
+    end_quarter <- isolate(ifelse(input$end_quarter == "",
+                                  "2015.1",
+                                  input$end_quarter))
+    plottitle <- paste("PRR Events that Contain", current_drug, "Between", start_quarter, "and", end_quarter)
+
+    data <- cv_prr %>% filter(drug.code =="AMPICILLIN")
+    p <- wordcloud::wordcloud(data$event.effect, data$PRR)
+
+  })
+  
+  # BCPNN Tab
   cv_bcpnn_tab <- reactive({
     input$searchButton
     #codes about dplyr::select specific generic, brand and reaction name in search side bar, making sure they're not NA
@@ -300,15 +385,20 @@ observe({
                                   "DRUG DEPENDENCE",
                                   input$search_rxn))
     
-    #current_date_range <- isolate(input$searchDateRange)
-    #escape.POSIXt <- dplyr:::escape.Date
+    start_quarter <- isolate(ifelse(input$start_quarter == "",
+                                    "1965.1",
+                                    input$start_quarter))
+    end_quarter <- isolate(ifelse(input$end_quarter == "",
+                                  "2015.1",
+                                  input$end_quarter))
     
-    bcpnn_tab_df <- cv_bcpnn %>% filter(drug.code == current_drug, event.effect == current_rxn)
+    bcpnn_tab_df <- cv_bcpnn %>% filter(drug.code == current_drug, event.effect == current_rxn, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter))
     
-    return(prr_tab_df)
+    return(bcpnn_tab_df)
   })
   
-  output$bcpnn_timeplot <- renderPloty({
+  # BCPNN Time Plot
+  output$bcpnn_timeplot <- renderPlotly({
     df <- cv_bcpnn_tab()
     
     current_drug <- isolate(ifelse(input$search_generic == "",
@@ -317,18 +407,65 @@ observe({
     current_rxn <- isolate(ifelse(input$search_rxn == "",
                                   "DRUG DEPENDENCE",
                                   input$search_rxn))
-    plottitle <- paste("Non-Cumulative BCPNN Time Plot for:", current_drug, "&", current_rxn)
+    plottitle <- paste("Non-Cumulative Information Component (IC) Time Plot for:", current_drug, "&", current_rxn)
     
     p <- df %>%
       ggplot(aes(x = `.id`, y = `Q_0.025.log.IC..`,group = 1)) +
       geom_line() + geom_point()  + 
       ggtitle(plottitle) + 
       xlab("Quarter") + 
-      ylab("BCPNN") +
+      ylab("2.5% Quantile of Posterior Distribution of IC") +
       theme_bw() +
       theme(plot.title = element_text(lineheight=.8, face="bold"), axis.text.x = element_text(angle=90, vjust=1))
     ggplotly(p)
   })
+  
+  # ROR Tab
+  cv_ror_tab <- reactive({
+    input$searchButton
+    #codes about dplyr::select specific generic, brand and reaction name in search side bar, making sure they're not NA
+    current_drug <- isolate(ifelse(input$search_generic == "",
+                                   "OXYCODONE HYDROCHLORIDE",
+                                   input$search_generic))
+    current_rxn <- isolate(ifelse(input$search_rxn == "",
+                                  "DRUG DEPENDENCE",
+                                  input$search_rxn))
+    
+    start_quarter <- isolate(ifelse(input$start_quarter == "",
+                                    "1965.1",
+                                    input$start_quarter))
+    end_quarter <- isolate(ifelse(input$end_quarter == "",
+                                  "2015.1",
+                                  input$end_quarter))
+    
+    ror_tab_df <- cv_ror %>% filter(drug.code == current_drug, event.effect == current_rxn, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter))
+    
+    return(ror_tab_df)
+  })
+  
+  # ROR Time Plot
+  output$ror_timeplot <- renderPlotly({
+    df <- cv_ror_tab()
+    
+    current_drug <- isolate(ifelse(input$search_generic == "",
+                                   "OXYCODONE HYDROCHLORIDE",
+                                   input$search_generic))
+    current_rxn <- isolate(ifelse(input$search_rxn == "",
+                                  "DRUG DEPENDENCE",
+                                  input$search_rxn))
+    plottitle <- paste("Non-Cumulative Reporting Odds Ratio Time Plot for:", current_drug, "&", current_rxn)
+    
+    p <- df %>%
+      ggplot(aes(x = `.id`, y = ROR,group = 1)) +
+      geom_line() + geom_point()  + 
+      ggtitle(plottitle) + 
+      xlab("Quarter") + 
+      ylab("ROR") +
+      theme_bw() +
+      theme(plot.title = element_text(lineheight=.8, face="bold"), axis.text.x = element_text(angle=90, vjust=1))
+    ggplotly(p)
+  })
+  
   
 }
 shinyApp(ui, server)
