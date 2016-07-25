@@ -21,19 +21,22 @@ cv_prr <- tbl(hcopen, "cv_prr_160713") %>% as.data.frame()
 cv_bcpnn <- tbl(hcopen, "cv_bcpnn_160712")%>% as.data.frame()
 cv_ror <- tbl(hcopen, "cv_ror_160714") %>% as.data.frame()
 
-#a <- cv_prr[order(cv_prr$PRR, decreasing = TRUE),]52199.00
-# THIAMAZOLE +CARDIAC FAILURE CONGESTIVE
 
-cv_prr[mapply(is.infinite, cv_prr)] <- 99999.99
+
+# Change Inf value to 0 
+cv_prr[mapply(is.infinite, cv_prr)] <- 0
 
 cv_prr <- cv_prr[order(cv_prr$.id,cv_prr$PRR, decreasing = TRUE),]
 cv_prr <- cv_prr[order(cv_prr$.id,decreasing = FALSE),]
 
 # cv_ror <- cv_ror[order(cv_ror$.id, cv_ror$ROR, decreasing=TRUE),] 48613.000
 # cv_ror <- cv_ror[order(cv_ror$.id, decreasing = FALSE),]
-cv_ror[mapply(is.infinite, cv_ror)] <- 99999.99
+cv_ror[mapply(is.infinite, cv_ror)] <- 0
 
-
+# NO ZERO VALUE IN ALL DATASETS, SO WE CHANGE Inf TO ZERO
+# cv_ror[cv_ror$ROR == 0,]
+# cv_prr[cv_prr$PRR == 0,]
+# cv_bcpnn[cv_bcpnn$Q_0.025.log.IC.. == 0,]
 
 #Oxycodone (ing= OXYCODONE HYDROCHLORIDE) -drug dependence
 # pioglitazone- bladder cance
@@ -44,6 +47,7 @@ cv_ror[mapply(is.infinite, cv_ror)] <- 99999.99
 # NICOTINE + DIZZINESS in BCPNN
 # NICOTINE + CHEST PAIN in BCPNN
 # AMPICILLIN +RASH !!!!
+# THIAMAZOLE +CARDIAC FAILURE CONGESTIVE
 
 ########################### Functions ############################
 
@@ -329,15 +333,16 @@ server <- function(input, output, session) {
     #prr_tab_df <- cv_prr[cv_prr$drug.code== current_drug & cv_prr$event.effect == current_rxn,]
     
     prr_tab_df <- cv_prr %>% filter(drug.code == current_drug, event.effect == current_rxn, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter))
-      
-    return(prr_tab_df)
+    prr_tab_wc <- cv_prr %>% filter(drug.code == current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter))  
+    
+    return(list(prr_tab_df <- prr_tab_df,
+                prr_tab_wc <- prr_tab_wc))
   })
   
   
   # PRR Time Plot
   output$prr_timeplot <- renderPlotly({
-    
-    df <- cv_prr_tab()
+    df <- as.data.frame(cv_prr_tab()[1])
     current_drug <- isolate(ifelse(input$search_generic == "",
                                    "OXYCODONE HYDROCHLORIDE",
                                    input$search_generic))
@@ -361,45 +366,26 @@ server <- function(input, output, session) {
   
   # PRR Tab: Event Wordcloud based on PRR
   output$prr_event_PRRwordcloud <- renderPlot({
-    current_drug <- isolate(ifelse(input$search_generic == "",
-                                   "OXYCODONE HYDROCHLORIDE",
-                                   input$search_generic))
-    start_quarter <- isolate(ifelse(input$start_quarter == "",
-                                    "1965.1",
-                                    input$start_quarter))
-    end_quarter <- isolate(ifelse(input$end_quarter == "",
-                                  "2015.1",
-                                  input$end_quarter))
+    df <- as.data.frame(cv_prr_tab()[2])
 
-    data <- cv_prr %>% filter(drug.code ==current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter), PRR < 99999.99) %>%
-      arrange(desc(PRR)) %>% dplyr::select(event.effect, PRR) %>% slice(1:20)
-    #png("wordcloud_packages.png", width=1280,height=400)
+    data <- df %>% filter(PRR < 99999.99) %>% arrange(desc(PRR)) %>% dplyr::select(event.effect, PRR) %>% slice(1:20)
+
     wordcloud::wordcloud(words = data$event.effect, freq = data$PRR, scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
-    #dev.off()
+
   })
   # scale = c(1, 0.2)
   
   # PRR Tab: Event Wordcloud based on frequency of event.effect
   output$prr_event_FREQwordcloud <- renderPlot({
-    current_drug <- isolate(ifelse(input$search_generic == "",
-                                   "OXYCODONE HYDROCHLORIDE",
-                                   input$search_generic))
-    start_quarter <- isolate(ifelse(input$start_quarter == "",
-                                    "1965.1",
-                                    input$start_quarter))
-    end_quarter <- isolate(ifelse(input$end_quarter == "",
-                                  "2015.1",
-                                  input$end_quarter))
+    df <- as.data.frame(cv_prr_tab()[2])
     
-    data2 <- cv_prr %>% filter(drug.code ==current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter)) %>% 
-      group_by(event.effect)%>% dplyr::summarise(count = n()) %>% arrange(desc(count))%>% slice(1:20)
-    #png("wordcloud_packages.png", width=1280,height=400)
+    data2 <- df %>% group_by(event.effect)%>% dplyr::summarise(count = n()) %>% arrange(desc(count))%>% slice(1:20)
+
     wordcloud::wordcloud(words = data2$event.effect, freq = data2$count, scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
-    #dev.off()
   })
-  #scale = c(1.5, 0.2)
   
-  # BCPNN Tab
+
+  ###################### BCPNN Tab #######################
   cv_bcpnn_tab <- reactive({
     input$searchButton
     #codes about dplyr::select specific generic, brand and reaction name in search side bar, making sure they're not NA
@@ -418,13 +404,15 @@ server <- function(input, output, session) {
                                   input$end_quarter))
     
     bcpnn_tab_df <- cv_bcpnn %>% filter(drug.code == current_drug, event.effect == current_rxn, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter))
+    bcpnn_tab_wc <- cv_bcpnn %>% filter(drug.code == current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter))
     
-    return(bcpnn_tab_df)
+    return(list(bcpnn_tab_df <- bcpnn_tab_df,
+                bcpnn_tab_wc <-bcpnn_tab_wc))
   })
   
   # BCPNN Time Plot
   output$bcpnn_timeplot <- renderPlotly({
-    df <- cv_bcpnn_tab()
+    df <- as.data.frame(cv_bcpnn_tab()[1])
     
     current_drug <- isolate(ifelse(input$search_generic == "",
                                    "OXYCODONE HYDROCHLORIDE",
@@ -447,37 +435,21 @@ server <- function(input, output, session) {
   
   # BCPNN Tab: Event wordcloud based on IC
   output$bcpnn_event_ICwordcloud <- renderPlot({
-    current_drug <- isolate(ifelse(input$search_generic == "",
-                                   "OXYCODONE HYDROCHLORIDE",
-                                   input$search_generic))
-    start_quarter <- isolate(ifelse(input$start_quarter == "",
-                                    "1965.1",
-                                    input$start_quarter))
-    end_quarter <- isolate(ifelse(input$end_quarter == "",
-                                  "2015.1",
-                                  input$end_quarter))
+    df <- as.data.frame(cv_bcpnn_tab()[2])
     
-    data <- cv_bcpnn %>% filter(drug.code ==current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter)) %>%
-      arrange(desc(Q_0.025.log.IC..)) %>% dplyr::select(event.effect,`Q_0.025.log.IC..` ) %>% slice(1:20)
+    data <- df %>% arrange(desc(Q_0.025.log.IC..)) %>% dplyr::select(event.effect,`Q_0.025.log.IC..` ) %>% slice(1:20)
     wordcloud::wordcloud(words = data$event.effect, freq = data$Q_0.025.log.IC.., scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
   })
   
   # BCPNN Tab: Event wordcloud based on adverse event frequency
   output$bcpnn_event_FREQwordcloud <- renderPlot({
-    current_drug <- isolate(ifelse(input$search_generic == "",
-                                   "OXYCODONE HYDROCHLORIDE",
-                                   input$search_generic))
-    start_quarter <- isolate(ifelse(input$start_quarter == "",
-                                    "1965.1",
-                                    input$start_quarter))
-    end_quarter <- isolate(ifelse(input$end_quarter == "",
-                                  "2015.1",
-                                  input$end_quarter))
+    df <- as.data.frame(cv_bcpnn_tab()[2])
     
-    data2 <- cv_bcpnn %>% filter(drug.code ==current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter)) %>% 
-      group_by(event.effect)%>% dplyr::summarise(count = n()) %>% arrange(desc(count))%>% slice(1:20)
+    data2 <- df %>% group_by(event.effect)%>% dplyr::summarise(count = n()) %>% arrange(desc(count))%>% slice(1:20)
     wordcloud::wordcloud(words = data2$event.effect, freq = data2$count, scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
   })
+  
+
   
   # ROR Tab
   cv_ror_tab <- reactive({
@@ -498,13 +470,15 @@ server <- function(input, output, session) {
                                   input$end_quarter))
     
     ror_tab_df <- cv_ror %>% filter(drug.code == current_drug, event.effect == current_rxn, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter))
+    ror_tab_wc <- cv_ror %>% filter(drug.code == current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter))
     
-    return(ror_tab_df)
+    return(list(ror_tab_df <- ror_tab_df,
+                ror_tab_wc <- ror_tab_wc))
   })
   
   # ROR Time Plot
   output$ror_timeplot <- renderPlotly({
-    df <- cv_ror_tab()
+    df <- as.data.frame(cv_ror_tab()[1])
     
     current_drug <- isolate(ifelse(input$search_generic == "",
                                    "OXYCODONE HYDROCHLORIDE",
@@ -527,38 +501,21 @@ server <- function(input, output, session) {
   
   # ROR Tab: Wordcloud based on ROR
   output$ror_event_RORwordcloud <- renderPlot({
-    current_drug <- isolate(ifelse(input$search_generic == "",
-                                   "OXYCODONE HYDROCHLORIDE",
-                                   input$search_generic))
-    start_quarter <- isolate(ifelse(input$start_quarter == "",
-                                    "1965.1",
-                                    input$start_quarter))
-    end_quarter <- isolate(ifelse(input$end_quarter == "",
-                                  "2015.1",
-                                  input$end_quarter))
+    df <- as.data.frame(cv_ror_tab()[2])
     
-    data <- cv_ror %>% filter(drug.code ==current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter)) %>%
-      arrange(desc(ROR)) %>% dplyr::select(event.effect,ROR ) %>% slice(1:20)
+    data <- df  %>% arrange(desc(ROR)) %>% dplyr::select(event.effect,ROR ) %>% slice(1:20)
     wordcloud::wordcloud(words = data$event.effect, freq = data$ROR, scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
   })
   
   # ROR Tab: wordcloud based on adverse event frequency
   output$ror_event_FREQwordcloud <- renderPlot({
-    current_drug <- isolate(ifelse(input$search_generic == "",
-                                   "OXYCODONE HYDROCHLORIDE",
-                                   input$search_generic))
-    start_quarter <- isolate(ifelse(input$start_quarter == "",
-                                    "1965.1",
-                                    input$start_quarter))
-    end_quarter <- isolate(ifelse(input$end_quarter == "",
-                                  "2015.1",
-                                  input$end_quarter))
+    df <- as.data.frame(cv_ror_tab()[2])
     
-    data2 <- cv_ror %>% filter(drug.code ==current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter)) %>% 
-      group_by(event.effect)%>% dplyr::summarise(count = n()) %>% arrange(desc(count))%>% slice(1:20)
+    data2 <- df %>% group_by(event.effect)%>% dplyr::summarise(count = n()) %>% arrange(desc(count))%>% slice(1:20)
     wordcloud::wordcloud(words = data2$event.effect, freq = data2$count, scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
   })
   
+
   
 }
 shinyApp(ui, server)
