@@ -11,9 +11,10 @@ library(DT)
 library(googleVis)
 # library(openfda)
 library(stringr)
-library(PhViD)
 library(utils)
 library(dplyr)
+library(tm)
+library(wordcloud)
 
 hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
 cv_prr <- tbl(hcopen, "cv_prr_160713") %>% as.data.frame()
@@ -95,18 +96,8 @@ ui <- dashboardPage(
                    options = list(create = TRUE,
                                   placeholder = 'Please select an option below',
                                   onInitialize = I('function() { this.setValue(""); }'))),
-    # dateRangeInput("searchDateRange",
-    #                "Date Range",
-    #                start = "1965-01-01",
-    #                end = Sys.Date(),
-    #                startview = "year",
-    #                format = "yyyy-mm-dd"),
-    ##add more menu filter here
     
     actionButton("searchButton", "Search")
-    # tags$br(),
-    # tags$h3(strong("Current Search:")),
-    # tableOutput("current_search")
   ), 
   
   dashboardBody(
@@ -124,73 +115,90 @@ ui <- dashboardPage(
                   width = 12), 
                   
                   tabPanel(
-                    "Word Cloud",
-                    
-                  )
+                    "Word Cloud Based on PRR",
+                    plotOutput("prr_event_PRRwordcloud"),
+                    tags$br(),
+                    tags$p("This Word Cloud demonstrates Top20 Adverse Events Related to Selected Drug Based on PRR value. 
+                           The size of the words are proportional to the value of PRR.")
+                  ),
+                  tabPanel(
+                    "Word Cloud Based on Frequency",
+                    plotOutput("prr_event_FREQwordcloud"),
+                    tags$br(),
+                    tags$p("This Word Cloud demonstrates Top20 Adverse Events Related to Selected Drug Based on Event Frequency During Selected Time Range. 
+                           The size of the words are proportional to the number of occurence of that adverse event.")
+                  ),
                 width=12
                 )
-                # box(htmlOutput("sexplot"),
-                #     tags$br(),
-                #     tags$p("Unknown includes reports explicitly marked unknown and Not Specified includes reports with no gender information."),
-                #     title = tags$h2("Gender"), width = 4),
-                # box(htmlOutput("agegroupplot"),
-                #     tags$br(),
-                #     tags$p("Unknown includes reports with no age information."), 
-                #     title = tags$h2("Age Groups"), width = 4),
-                # box(plotlyOutput("agehist"), title = tags$h2("Age Histogram"), width = 4)
               )
       ),
       
       tabItem(tabName = "bcpnndata",
               fluidRow(
-                box(plotlyOutput(outputId = "bcpnn_timeplot"),
+                tabBox(
+                  tabPanel(
+                    "Time Plot",
+                    plotlyOutput(outputId = "bcpnn_timeplot"),
                     tags$br(),
-                    tags$p("Reports by month from Canada Vigilance Adverse Reaction Online Database.
-                 Trendline is a local non-parametric regression calculated with the LOESS model.
-                 The shaded area is an approximation of the 95% confidence interval of the regression."),
-                    width = 12
+                    tags$p("Information Component (IC) results by quarter. 
+                          Value of IC indicates the signal strength of the particular Drug & Adverse_reaction pair. 
+                          Details can be found in DISP_about documentation"),
+                    width = 12), 
+                  
+                  tabPanel(
+                    "Word Cloud Based on IC",
+                    plotOutput("bcpnn_event_ICwordcloud"),
+                    tags$br(),
+                    tags$p("This Word Cloud demonstrates Top20 Adverse Events Related to Selected Drug Based on IC value. 
+                           The size of the words are proportional to the value of IC.")
+                  ),
+                  tabPanel(
+                    "Word Cloud Based on Frequency",
+                    plotOutput("bcpnn_event_FREQwordcloud"),
+                    tags$br(),
+                    tags$p("This Word Cloud demonstrates Top20 Adverse Events Related to Selected Drug Based on Event Frequency During Selected Time Range. 
+                           The size of the words are proportional to the number of occurence of that adverse event.")
+                  ),
+                  width=12
                 )
-      #           # box(htmlOutput("reporterplot"), 
-      #           #     tags$br(),
-      #           #     tags$p("Qualification of the person who filed the report."),
-      #           #     tags$p("Unknown is the number of reports without the primarysource.qualification field."),
-      #           #     title = tags$h2("Reporter"), width = 4),
-      #           # box(htmlOutput("seriousplot"), 
-      #           #     tags$br(),
-      #           #     tags$p("Reports marked as serious."),
-      #           #     title = tags$h2("Serious reports"), width = 4),
-      #           # box(htmlOutput("seriousreasonsplot"), 
-      #           #     tags$br(),
-      #           #     tags$p("Total sums to more than 100% because reports can be marked serious for multiple reasons."),
-      #           #     title = tags$h2("Reasons for serious reports"), width = 4)
               )
+
+   
       ),
 
       tabItem(tabName = "rordata",
               fluidRow(
-                box(plotlyOutput(outputId = "ror_timeplot"),
+                tabBox(
+                  tabPanel(
+                    "Time Plot",
+                    plotlyOutput(outputId = "ror_timeplot"),
                     tags$br(),
-                    tags$p("Reports by month from Canada Vigilance Adverse Reaction Online Database.
-                 Trendline is a local non-parametric regression calculated with the LOESS model.
-                 The shaded area is an approximation of the 95% confidence interval of the regression."),
-                    width = 12
+                    tags$p("Reporting Odds Ratio (ROR) results by quarter. 
+                          Value of ROR indicates the signal strength of the particular Drug & Adverse_reaction pair. 
+                          Details can be found in DISP_about documentation"),
+                    width = 12), 
+                  
+                  tabPanel(
+                    "Word Cloud Based on ROR",
+                    plotOutput("ror_event_RORwordcloud"),
+                    tags$br(),
+                    tags$p("This Word Cloud demonstrates Top20 Adverse Events Related to Selected Drug Based on ROR value. 
+                           The size of the words are proportional to the value of ROR.")
+                  ),
+                  tabPanel(
+                    "Word Cloud Based on Frequency",
+                    plotOutput("ror_event_FREQwordcloud"),
+                    tags$br(),
+                    tags$p("This Word Cloud demonstrates Top20 Adverse Events Related to Selected Drug Based on Event Frequency During Selected Time Range. 
+                           The size of the words are proportional to the number of occurence of that adverse event.")
+                  ),
+                  width=12
                 )
-                #           # box(htmlOutput("reporterplot"), 
-                #           #     tags$br(),
-                #           #     tags$p("Qualification of the person who filed the report."),
-                #           #     tags$p("Unknown is the number of reports without the primarysource.qualification field."),
-                #           #     title = tags$h2("Reporter"), width = 4),
-                #           # box(htmlOutput("seriousplot"), 
-                #           #     tags$br(),
-                #           #     tags$p("Reports marked as serious."),
-                #           #     title = tags$h2("Serious reports"), width = 4),
-                #           # box(htmlOutput("seriousreasonsplot"), 
-                #           #     tags$br(),
-                #           #     tags$p("Total sums to more than 100% because reports can be marked serious for multiple reasons."),
-                #           #     title = tags$h2("Reasons for serious reports"), width = 4)
+
               )
       ),
       
+
       # tabItem(tabName = "downloaddata",
       #         fluidRow(
       #           box(
@@ -229,9 +237,12 @@ ui <- dashboardPage(
       tabItem(tabName = "aboutinfo",
               tags$h2("About the Shiny App"),
               tags$p("This is a prototyping platform to utilize open data sources (e.g. Canada Vigilance Adverse Reaction Online Database) 
-                      and provide visualizations in an interactive format. Further analysis can be conducted and added onto this platform to make 
-                      better use of the data. Data provided by the Canada Vigilance Adverse Reaction Online Database: "),
+                      to conduct disproportionality analysis for safety signal detection. 
+                      It provides visualizations in an interactive format to demonstrate the results of multiple disproportionality analysis. 
+                      Data provided by the Canada Vigilance Adverse Reaction Online Database: "),
               tags$a(href="http://www.hc-sc.gc.ca/dhp-mps/medeff/databasdon/index-eng.php", "Click here!"),
+              tags$p("Detailed documentation on all disproportionality analyses can be found in here: "),
+              #tags$a(href = "https://rstudio.hres.ca/?view=rmarkdown", "Documentation of Analysis"),
               tags$br(),
               tags$strong("Authors:"),
               fluidRow(
@@ -245,14 +256,7 @@ ui <- dashboardPage(
                   tags$p("Sophia He, BSc in Progress"),
                   tags$p("Jr. Data Scientist Co-op, Health Products and Food Branch"),
                   tags$p("Health Canada / Government of Canada"),
-                  tags$p("sophia.he@canada.ca")
-                ),
-                box(
-                  tags$h3("Disproportionality Analysis - Bayesian confidence propagation neural network (BCPNN) Method"),
-                  tags$p("..."),
-                  tags$br(),
-                  tags$h3("Disproportionality Analysis - Proportional Reporting Ratio (PRR) Method"),
-                  tags$p("...")
+                  tags$p("sophia.he@canada.ca & yunqingh@sfu.ca")
                 )
               )
       )
@@ -354,10 +358,9 @@ server <- function(input, output, session) {
   })
   
 
-  a <- cv_prr %>% filter(drug.code == "AMPICILLIN")
-  # PRR Event Wordcloud based on PRR
-  output$prr_event_wordcloud <- renderPlotly({
-    df <- cv_prr_tab()
+  
+  # PRR Tab: Event Wordcloud based on PRR
+  output$prr_event_PRRwordcloud <- renderPlot({
     current_drug <- isolate(ifelse(input$search_generic == "",
                                    "OXYCODONE HYDROCHLORIDE",
                                    input$search_generic))
@@ -367,12 +370,34 @@ server <- function(input, output, session) {
     end_quarter <- isolate(ifelse(input$end_quarter == "",
                                   "2015.1",
                                   input$end_quarter))
-    plottitle <- paste("PRR Events that Contain", current_drug, "Between", start_quarter, "and", end_quarter)
 
-    data <- cv_prr %>% filter(drug.code =="AMPICILLIN")
-    p <- wordcloud::wordcloud(data$event.effect, data$PRR)
-
+    data <- cv_prr %>% filter(drug.code ==current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter), PRR < 99999.99) %>%
+      arrange(desc(PRR)) %>% dplyr::select(event.effect, PRR) %>% slice(1:20)
+    #png("wordcloud_packages.png", width=1280,height=400)
+    wordcloud::wordcloud(words = data$event.effect, freq = data$PRR, scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
+    #dev.off()
   })
+  # scale = c(1, 0.2)
+  
+  # PRR Tab: Event Wordcloud based on frequency of event.effect
+  output$prr_event_FREQwordcloud <- renderPlot({
+    current_drug <- isolate(ifelse(input$search_generic == "",
+                                   "OXYCODONE HYDROCHLORIDE",
+                                   input$search_generic))
+    start_quarter <- isolate(ifelse(input$start_quarter == "",
+                                    "1965.1",
+                                    input$start_quarter))
+    end_quarter <- isolate(ifelse(input$end_quarter == "",
+                                  "2015.1",
+                                  input$end_quarter))
+    
+    data2 <- cv_prr %>% filter(drug.code ==current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter)) %>% 
+      group_by(event.effect)%>% dplyr::summarise(count = n()) %>% arrange(desc(count))%>% slice(1:20)
+    #png("wordcloud_packages.png", width=1280,height=400)
+    wordcloud::wordcloud(words = data2$event.effect, freq = data2$count, scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
+    #dev.off()
+  })
+  #scale = c(1.5, 0.2)
   
   # BCPNN Tab
   cv_bcpnn_tab <- reactive({
@@ -420,6 +445,40 @@ server <- function(input, output, session) {
     ggplotly(p)
   })
   
+  # BCPNN Tab: Event wordcloud based on IC
+  output$bcpnn_event_ICwordcloud <- renderPlot({
+    current_drug <- isolate(ifelse(input$search_generic == "",
+                                   "OXYCODONE HYDROCHLORIDE",
+                                   input$search_generic))
+    start_quarter <- isolate(ifelse(input$start_quarter == "",
+                                    "1965.1",
+                                    input$start_quarter))
+    end_quarter <- isolate(ifelse(input$end_quarter == "",
+                                  "2015.1",
+                                  input$end_quarter))
+    
+    data <- cv_bcpnn %>% filter(drug.code ==current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter)) %>%
+      arrange(desc(Q_0.025.log.IC..)) %>% dplyr::select(event.effect,`Q_0.025.log.IC..` ) %>% slice(1:20)
+    wordcloud::wordcloud(words = data$event.effect, freq = data$Q_0.025.log.IC.., scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
+  })
+  
+  # BCPNN Tab: Event wordcloud based on adverse event frequency
+  output$bcpnn_event_FREQwordcloud <- renderPlot({
+    current_drug <- isolate(ifelse(input$search_generic == "",
+                                   "OXYCODONE HYDROCHLORIDE",
+                                   input$search_generic))
+    start_quarter <- isolate(ifelse(input$start_quarter == "",
+                                    "1965.1",
+                                    input$start_quarter))
+    end_quarter <- isolate(ifelse(input$end_quarter == "",
+                                  "2015.1",
+                                  input$end_quarter))
+    
+    data2 <- cv_bcpnn %>% filter(drug.code ==current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter)) %>% 
+      group_by(event.effect)%>% dplyr::summarise(count = n()) %>% arrange(desc(count))%>% slice(1:20)
+    wordcloud::wordcloud(words = data2$event.effect, freq = data2$count, scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
+  })
+  
   # ROR Tab
   cv_ror_tab <- reactive({
     input$searchButton
@@ -464,6 +523,40 @@ server <- function(input, output, session) {
       theme_bw() +
       theme(plot.title = element_text(lineheight=.8, face="bold"), axis.text.x = element_text(angle=90, vjust=1))
     ggplotly(p)
+  })
+  
+  # ROR Tab: Wordcloud based on ROR
+  output$ror_event_RORwordcloud <- renderPlot({
+    current_drug <- isolate(ifelse(input$search_generic == "",
+                                   "OXYCODONE HYDROCHLORIDE",
+                                   input$search_generic))
+    start_quarter <- isolate(ifelse(input$start_quarter == "",
+                                    "1965.1",
+                                    input$start_quarter))
+    end_quarter <- isolate(ifelse(input$end_quarter == "",
+                                  "2015.1",
+                                  input$end_quarter))
+    
+    data <- cv_ror %>% filter(drug.code ==current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter)) %>%
+      arrange(desc(ROR)) %>% dplyr::select(event.effect,ROR ) %>% slice(1:20)
+    wordcloud::wordcloud(words = data$event.effect, freq = data$ROR, scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
+  })
+  
+  # ROR Tab: wordcloud based on adverse event frequency
+  output$ror_event_FREQwordcloud <- renderPlot({
+    current_drug <- isolate(ifelse(input$search_generic == "",
+                                   "OXYCODONE HYDROCHLORIDE",
+                                   input$search_generic))
+    start_quarter <- isolate(ifelse(input$start_quarter == "",
+                                    "1965.1",
+                                    input$start_quarter))
+    end_quarter <- isolate(ifelse(input$end_quarter == "",
+                                  "2015.1",
+                                  input$end_quarter))
+    
+    data2 <- cv_ror %>% filter(drug.code ==current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter)) %>% 
+      group_by(event.effect)%>% dplyr::summarise(count = n()) %>% arrange(desc(count))%>% slice(1:20)
+    wordcloud::wordcloud(words = data2$event.effect, freq = data2$count, scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
   })
   
   
