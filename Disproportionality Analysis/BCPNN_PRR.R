@@ -83,7 +83,7 @@ for(i in 1:length(quarters)){
   bayes_result_final[[paste("BCPNN - Quarter: ",quarters[i], sep="")]] <- list(bayes_result[[i]]$ALLSIGNALS)
 }
 
-bayes_result[[201]]$NB.SIGNALS
+bayes_result[[1]]$SIGNALS
 head(bayes_table[[2]])
 str(bayes_result_final)
 head(bayes_table[[1]]$data)
@@ -97,7 +97,7 @@ for(i in 1:length(quarters)){
   bayes_result_final[[i]] <- Map(cbind, bayes_result_final[[i]], quarter = quarters[i])
 }
 
-str(bayes_result_final)
+str(bayes_table)
 
 # merge all elements in bayes_PRR_result_final list
 bayes_result_all <-  ldply(bayes_result_final, data.frame)
@@ -248,9 +248,12 @@ bayes_ROR_result_final <- vector(mode = "list") # ALLSIGNALS of each bayes_ROR_r
 
 
 for(i in 1:length(quarters)){
-  bayes_ROR_result[i] <- list(ROR(bayes_table[[i]], OR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2))
+  bayes_ROR_result[i] <- list(ROR(bayes_table[[i]], OR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0, RANKSTAT = 2))
   bayes_ROR_result_final[[paste("ROR - Quarter: ",quarters[i], sep="")]] <- list(bayes_ROR_result[[i]]$ALLSIGNALS)
 }
+
+b <- bayes_ROR_result[[1]]$ALLSIGNALS
+max(b$`LB95(log(ROR))`)
 
 bayes_ROR_result_final[[3]]
 str(bayes_ROR_result_final)
@@ -287,8 +290,118 @@ dbWriteTable(testconnect, "cv_ror_160714", bayes_ROR_result_all)
 
 dbRemoveTable(testconnect, "test")
 
+############################################## Cumulative BCPNN ##############################################################
+# create lists
+bayes_cumulative_table1 <- vector(mode = "list") # as.PhVid_SHe for each quarter of frequency table
+bayes_cumulative_table <- vector(mode = "list") # calculate cumulative n11, n1. & n.1 & format it into a list fro BCPNN process
+bayes_cumulative_result <- vector(mode = "list") # BCPNN on each bayes_table
+bayes_cumulative_result_final <- vector(mode = "list") # ALLSIGNALS of each bayes_result
+
+# Cumulative as.PhVid_CUM1_SHe function1 to generate ing+AR+n11+n1.+n.1 dataframes within a list:bayes_cumulative_table1
+for(i in 1:length(quarters)){
+  bayes_cumulative_table1[[i]] <- as.PhVid_CUM1_SHe(data=as.data.frame(DISP_table[i]),MARGIN.THRES = 1)
+}
+bayes_cumulative_table1[[4]]
+
+# merge elements of bayes_cumulative_table1 list together
+bayes_cumulative_table1_all <-  ldply(bayes_cumulative_table1, data.frame)
+
+# calculate cumulative n11, n1. & n.1
+bayes_cumulative_table_final <- bayes_cumulative_table1_all %>% group_by(ing,PT_NAME_ENG) %>% mutate(n11_cum = cumsum(n11), n1._cum = cumsum(n1.), n.1_cum = cumsum(n.1)) %>%
+                                select(quarter, ing, PT_NAME_ENG,n11_cum,n1._cum,n.1_cum) %>% dplyr::rename(n11 = n11_cum, n1. = n1._cum, n.1 = n.1_cum)
+bayes_cumulative_table_final <- bayes_cumulative_table_final  %>% ungroup(ing, PT_NAME_ENG)
+
+# a <- bayes_cumulative_table_final[bayes_cumulative_table_final$ing == "INDINAVIR" & bayes_cumulative_table_final$PT_NAME_ENG == "Nausea",]
+# a
+
+# format bayes_cumulative_table_final into a list (bayes_cumulative_table) for BCPNN process
+bayes_cumulative_table <- vector(mode = "list")
+
+for (i in 1:length(quarters)){
+  bayes_cumulative_table[i] <- list(as.PhVid_CUM2_SHe(data=bayes_cumulative_table_final, i=i))
+}
 
 
+str(bayes_cumulative_table)
+a <- bayes_cumulative_table[[2]]$data
+a
+# Run BCPNN process
+bayes_cumulative_result <- vector(mode = "list") # BCPNN on each bayes_table
+bayes_cumulative_result_final <- vector(mode = "list") # ALLSIGNALS of each bayes_result
+test_list <- vector(mode="list")
+
+for(i in 189:201){
+  bayes_cumulative_result[i] <- list(BCPNN_SHe(bayes_cumulative_table[[i]], RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE, NB.MC=10000))
+}
+test_list[1] <- list(BCPNN(bayes_cumulative_table[[1]], RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE, NB.MC=10000))
+
+test_list[1]
+bayes_cumulative_table[[1]]$data
+head(bayes_table[[1]]$data)
+# extract ALLSIGNALS from each quarter & put it into a list
+for(i in 1:length(quarters)){
+  bayes_cumulative_result_final[[quarters[i]]] <- list(bayes_cumulative_result[[i]]$ALLSIGNALS)
+}
+
+# merge all elements in bayes_PRR_result_final list
+bayes_cumulative_result_all <-  ldply(bayes_cumulative_result_final, data.frame)
+#############################################################################################################################################################
+
+#############################################################################################################################################################
+MARGIN.THRES <- 3
+data <- as.data.frame(DISP_table[2])
+
+# Final non-cumulative as.phvid function
+as.PhVid_SHe <- function(data, MARGIN.THRES=1){
+  RES2 <- vector(mode = "list")
+  
+  n1._df <- aggregate(count~ing,data,sum)  %>% dplyr::rename(n1. = count) %>% as.data.table(n=-1)#9223*2
+  n.1_df <- aggregate(count~PT_NAME_ENG,data,sum)%>% dplyr::rename(n.1 = count)%>% as.data.table(n=-1) # 3170*2
+  
+  
+  df <- data %>% dplyr::rename(n11 = count) %>% dplyr::select(-quarter)
+  output <- df %>% dplyr::left_join(n1._df) %>% filter(is.na(n1.) == FALSE)
+  output1 <- df %>% left_join(n.1_df)%>% filter(is.na(n.1) == FALSE)
+  
+  test <- output %>% left_join(output1)  
+  RES2$data  <- test %>% dplyr::filter(is.na(test$n.1)== FALSE & test$n1.>= MARGIN.THRES & test$n.1>= MARGIN.THRES) %>% dplyr::select(n11, n1., n.1)
+  
+  
+  RES2$N <- sum(as.data.frame(RES2$data)$n11) 
+  
+  RES2$L <- test %>% dplyr::filter(is.na(test$n.1)== FALSE & test$n1.>= MARGIN.THRES & test$n.1>= MARGIN.THRES) %>% dplyr::select(ing,PT_NAME_ENG) %>% as.data.frame(n=-1)
+  return(RES2)
+}
+
+# Cumulative as.PhVid_CUM1_SHe function1 to generate ing+AR+n11+n1.+n.1 dataframe
+DISP_final <- DISP_final %>% filter(PT_NAME_ENG != "")
+data <- as.data.frame(DISP_table[2])
+MARGIN.THRES <- 1
+as.PhVid_CUM1_SHe <- function(data, MARGIN.THRES=1){
+  n1._df <- aggregate(count~ing,data,sum)  %>% dplyr::rename(n1. = count) %>% as.data.table(n=-1)#9223*2
+  n.1_df <- aggregate(count~PT_NAME_ENG,data,sum)%>% dplyr::rename(n.1 = count)%>% as.data.table(n=-1) # 3170*2
+  
+  
+  df <- data %>% dplyr::rename(n11 = count) #%>% dplyr::select(-quarter)
+  output <- df %>% dplyr::left_join(n1._df) %>% filter(is.na(n1.) == FALSE)
+  output1 <- df %>% left_join(n.1_df)%>% filter(is.na(n.1) == FALSE)
+  
+  test <- output %>% left_join(output1)  
+  
+  final_data  <- test %>% dplyr::filter(is.na(test$n.1)== FALSE & test$n1.>= MARGIN.THRES & test$n.1>= MARGIN.THRES) # %>% dplyr::select(n11, n1., n.1)
+  
+  return(final_data)
+}
+
+# as.PhVid_CUM2_SHe function to format bayes_cumulative_table_final into a list for BCPNN process
+as.PhVid_CUM2_SHe <- function(data, i){
+  RES3 <- vector(mode = "list")
+  
+  RES3$data <- data %>% dplyr::filter(quarter == quarters[1]) %>% select(n11,n1.,n.1)
+  RES3$N <- sum(as.data.frame(RES3$data)$n11)
+  RES3$L <- data %>% dplyr::filter(quarter == quarters[1]) %>% select(ing, PT_NAME_ENG)
+  return(RES3)
+}
 ######################################## as.PhVid_SHe function for margin.thres > 1 #################################################
 MARGIN.THRES <- 1
 data <- as.data.frame(DISP_table[1])
@@ -355,28 +468,9 @@ as.PhVid_SHe <- function(data, MARGIN.THRES=1){
   return(RES2)
 }
 
-MARGIN.THRES <- 3
-data <- as.data.frame(DISP_table[2])
-as.PhVid_SHe <- function(data, MARGIN.THRES=1){
-  RES2 <- vector(mode = "list")
-  
-  n1._df <- aggregate(count~ing,data,sum)  %>% dplyr::rename(n1. = count) %>% as.data.table(n=-1)#9223*2
-  n.1_df <- aggregate(count~PT_NAME_ENG,data,sum)%>% dplyr::rename(n.1 = count)%>% as.data.table(n=-1) # 3170*2
-  
-  
-  df <- data %>% dplyr::rename(n11 = count) %>% dplyr::select(-quarter)
-  output <- df %>% dplyr::left_join(n1._df) %>% filter(is.na(n1.) == FALSE)
-  output1 <- df %>% left_join(n.1_df)%>% filter(is.na(n.1) == FALSE)
-  
-  test <- output %>% left_join(output1)  
-  RES2$data  <- test %>% dplyr::filter(is.na(test$n.1)== FALSE & test$n1.>= MARGIN.THRES & test$n.1>= MARGIN.THRES) %>% dplyr::select(n11, n1., n.1)
-  
-  
-  RES2$N <- sum(as.data.frame(RES2$data)$n11) 
-  
-  RES2$L <- test %>% dplyr::filter(is.na(test$n.1)== FALSE & test$n1.>= MARGIN.THRES & test$n.1>= MARGIN.THRES) %>% dplyr::select(ing,PT_NAME_ENG) %>% as.data.frame(n=-1)
-  return(RES2)
-}
+
+
+
 
 
 ####################################################################################################################
