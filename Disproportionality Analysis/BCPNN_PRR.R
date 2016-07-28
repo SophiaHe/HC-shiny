@@ -75,15 +75,15 @@ for(i in 1:length(quarters)){
   #bayes_result_final[[paste("BCPNN - Quarter: ",quarters[i], sep="")]] <- list(bayes_result[[i]]$ALLSIGNALS)
 }
 
-for(i in 184:length(quarters)){
-  bayes_result[i] <- list(BCPNN(bayes_table[[i]], RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE))
+for(i in 199:201){
+  bayes_result[i] <- list(BCPNN_SHe(bayes_table[[i]], RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE))
 }
 
 for(i in 1:length(quarters)){
   bayes_result_final[[paste("BCPNN - Quarter: ",quarters[i], sep="")]] <- list(bayes_result[[i]]$ALLSIGNALS)
 }
 
-bayes_result[[1]]$SIGNALS
+bayes_result[[100]]$ALLSIGNALS
 head(bayes_table[[2]])
 str(bayes_result_final)
 head(bayes_table[[1]]$data)
@@ -321,31 +321,116 @@ for (i in 1:length(quarters)){
   bayes_cumulative_table[i] <- list(as.PhVid_CUM2_SHe(data=bayes_cumulative_table_final, i=i))
 }
 
-
 str(bayes_cumulative_table)
 a <- bayes_cumulative_table[[2]]$data
 a
 # Run BCPNN process
-bayes_cumulative_result <- vector(mode = "list") # BCPNN on each bayes_table
-bayes_cumulative_result_final <- vector(mode = "list") # ALLSIGNALS of each bayes_result
-test_list <- vector(mode="list")
-
-for(i in 189:201){
-  bayes_cumulative_result[i] <- list(BCPNN_SHe(bayes_cumulative_table[[i]], RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE, NB.MC=10000))
+for(i in 1:50){
+  bayes_cumulative_result[i] <- list(BCPNN(bayes_cumulative_table[[i]], RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE, NB.MC=10000))
 }
-test_list[1] <- list(BCPNN(bayes_cumulative_table[[1]], RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE, NB.MC=10000))
+################################# IMPORTANT NOTES ON CUMULATIVE BCPNN ################################
 
-test_list[1]
-bayes_cumulative_table[[1]]$data
-head(bayes_table[[1]]$data)
-# extract ALLSIGNALS from each quarter & put it into a list
+# the reason why lots of NA are produced in Q2.5Log(IC) for cumulative BCPNN is that since both n1. and n.1 are cumulative as well, 
+# when conducting Monte Carlo simulation, N - n1. and N - n.1 are used as parameters which can produce negative value. 
+# MC Simulation includes random generation from the Dirichlet distribution (using rdirichlet which uses random generation of Gamma Distribution),
+# the shape and scale parameters for such generation CANNOT be negative. 
+
+
+str(bayes_cumulative_result)
+bayes_cumulative_result[[2]]$ALLSIGNALS
+
+# bayes_cumulative_table VS. bayes_table
+DATA <- bayes_table[[2]]$data
+N <- bayes_table[[2]]$N
+L <- bayes_table[[2]]$L
+
+n11 <- DATA[,1]
+n1. <- DATA[,2] 
+n.1 <- DATA[,3] 
+n10 <- n1. - n11
+n01 <- n.1 - n11
+n00 <- N - (n11+n10+n01)
+E <- n1. * n.1 / N
+
+
+require(MCMCpack)
+n1. <- n11 + n10
+n.1 <- n11 + n01
+Nb_Obs <- length(n11)
+
+## Nouvelles priors
+q1. <- (n1. +.5)/(N +1)
+q.1 <- (n.1 +.5)/(N +1)
+q.0 <- (N - n.1 +.5)/(N +1)
+q0. <- (N - n1. +.5)/(N +1)
+
+a.. <- .5/(q1.*q.1) ## le .5 devrait pouvoir être changé
+
+a11 <- q1.*q.1* a..
+a10 <- q1.*q.0* a..
+a01 <- q0.*q.1* a..
+a00 <- q0.*q.0* a..
+
+g11 <- a11 + n11
+g10 <- a10 + n10
+g01 <- a01 + n01
+g00 <- a00 + n00
+g1. <- g11 + g10
+g.1 <- g11 + g01
+
+post.H0 <- vector(length=length(n11))
+LB <- vector(length=length(n11))
+quantile <- vector("numeric",length=length(n11))
+RR0 = 1
+for (m in 1 : length(n11)){
+  p <- rdirichlet(NB.MC,c(g11[m],g10[m],g01[m],g00[m]))
+  p11 <- p[,1]
+  p1. <- p11 + p[,2]
+  p.1 <- p11 + p[,3]	
+  IC_monte <- log(p11/(p1.* p.1)) # 0.5474298 
+  temp <- IC_monte < log(RR0)
+  post.H0[m] <- sum(temp)/NB.MC
+  LB[m] <- sort(IC_monte)[round(NB.MC * 0.025)] # -1.785071
+}
+
+a <- sort(IC_monte)
+a1 <- a[round(NB.MC * 0.025)]
+
+
+############################################################################################################################################
+NB.MC = 10000
+p <- rdirichlet(NB.MC,c(g11[1],g10[1],g01[1],g00[1]))
+alpha = c(g11[1],g10[1],g01[1],g00[1])
+
+l <- length(alpha)
+n = 10000
+x <- matrix(rgamma(l * n, alpha), ncol = l, byrow = TRUE)
+sm <- x %*% rep(1, l)
+
 for(i in 1:length(quarters)){
   bayes_cumulative_result_final[[quarters[i]]] <- list(bayes_cumulative_result[[i]]$ALLSIGNALS)
 }
 
-# merge all elements in bayes_PRR_result_final list
-bayes_cumulative_result_all <-  ldply(bayes_cumulative_result_final, data.frame)
-#############################################################################################################################################################
+################################################## Instead of using cumulative count of D*AR pair, plot cumulative IC ##################################################################
+cv_bcpnn <- tbl(hcopen, "cv_bcpnn_160712")%>% as.data.frame()
+head(cv_bcpnn)
+
+cv_bcpnn_cumulative <- cv_bcpnn %>% group_by(drug.code,event.effect) %>% mutate(Q_0.025.log.IC.._C = cumsum(Q_0.025.log.IC..)) 
+df <- cv_bcpnn_cumulative %>% filter(drug.code == "PENICILLIN V", event.effect == "RASH")
+df <- cv_bcpnn_cumulative %>% filter(drug.code == "OXYCODONE HYDROCHLORIDE", event.effect == "DRUG DEPENDENCE")
+
+
+p <- df %>%
+  ggplot(aes(x = `.id`, y = `Q_0.025.log.IC.._C`,group = 1)) +
+  geom_line() + geom_point()  + 
+  ggtitle("plottitle") + 
+  xlab("Quarter") + 
+  ylab("Cumulative 2.5% Quantile of Posterior Distribution of IC") +
+  theme_bw() +
+  theme(plot.title = element_text(lineheight=.8, face="bold"), axis.text.x = element_text(angle=90, vjust=1))
+ggplotly(p)
+
+
 
 #############################################################################################################################################################
 MARGIN.THRES <- 3
@@ -397,9 +482,9 @@ as.PhVid_CUM1_SHe <- function(data, MARGIN.THRES=1){
 as.PhVid_CUM2_SHe <- function(data, i){
   RES3 <- vector(mode = "list")
   
-  RES3$data <- data %>% dplyr::filter(quarter == quarters[1]) %>% select(n11,n1.,n.1)
+  RES3$data <- data %>% dplyr::filter(quarter == quarters[i]) %>% select(n11,n1.,n.1)%>%as.data.frame()
   RES3$N <- sum(as.data.frame(RES3$data)$n11)
-  RES3$L <- data %>% dplyr::filter(quarter == quarters[1]) %>% select(ing, PT_NAME_ENG)
+  RES3$L <- data %>% dplyr::filter(quarter == quarters[i]) %>% select(ing, PT_NAME_ENG)%>%as.data.frame()
   return(RES3)
 }
 ######################################## as.PhVid_SHe function for margin.thres > 1 #################################################
