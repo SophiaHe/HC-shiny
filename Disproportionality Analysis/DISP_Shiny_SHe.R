@@ -23,7 +23,7 @@ cv_ror <- tbl(hcopen, "cv_ror_160714") %>% as.data.frame()
 
 
 
-# Change Inf value to 0 
+# Change Inf value to 0 because there's no ZERO value in all datasets
 cv_prr[mapply(is.infinite, cv_prr)] <- 0
 
 cv_prr <- cv_prr[order(cv_prr$.id,cv_prr$PRR, decreasing = TRUE),]
@@ -33,14 +33,20 @@ cv_prr <- cv_prr[order(cv_prr$.id,decreasing = FALSE),]
 # cv_ror <- cv_ror[order(cv_ror$.id, decreasing = FALSE),]
 cv_ror[mapply(is.infinite, cv_ror)] <- 0
 
-# NO ZERO VALUE IN ALL DATASETS, SO WE CHANGE Inf TO ZERO
+
 # cv_ror[cv_ror$ROR == 0,]
 # cv_prr[cv_prr$PRR == 0,]
 # cv_bcpnn[cv_bcpnn$Q_0.025.log.IC.. == 0,]
 
-#Oxycodone (ing= OXYCODONE HYDROCHLORIDE) -drug dependence
+# signals with IC >= 0.05
+cv_bcpnn <- cv_bcpnn[order(cv_bcpnn$.id,cv_bcpnn$Q_0.025.log.IC.., decreasing = TRUE),]
+cv_bcpnn <- cv_bcpnn[order(cv_bcpnn$.id,decreasing = FALSE),]
+bcpnn_signals <- cv_bcpnn %>% filter( `Q_0.025.log.IC..` >= 0.05)
+prr_signals <- cv_prr %>% filter(`LB95.log.PRR..` >=1, count >1)
+
+#Oxycodone (ing= OXYCODONE HYDROCHLORIDE) -drug dependence & + DRUG WITHDRAWL SYDROME
 # pioglitazone- bladder cance
-#captopril (check spelling) and coughing
+#captopril (check spelling) and cough
 # PENICILLIN V + RASH
 # MEPERIDINE HYDROCHLORIDE + NAUSEA
 # IRON + BACK PAIN in BCPNN
