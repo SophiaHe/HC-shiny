@@ -79,14 +79,41 @@ for(i in 199:201){
   bayes_result[i] <- list(BCPNN_SHe(bayes_table[[i]], RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE))
 }
 
+test <-  vector(mode = "list")
+test[1] <- list(BCPNN_SHe(bayes_table[[201]], RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE))
+
+post.H0 <- vector(length=length(n11))
+LB <- vector(length=length(n11))
+quantile <- vector("numeric",length=length(n11))
+RR0 = 1
+for (m in 1 : length(n11)){
+  p <- rdirichlet(NB.MC,c(g11[m],g10[m],g01[m],g00[m]))
+  p11 <- p[,1]
+  p1. <- p11 + p[,2]
+  p.1 <- p11 + p[,3]	
+  IC_monte <- log(p11/(p1.* p.1)) # 0.5474298 
+  temp <- IC_monte < log(RR0)
+  post.H0[m] <- sum(temp)/NB.MC
+  LB[m] <- sort(IC_monte)[round(NB.MC * 0.025)] # -1.785071
+}
+
+RankStat = LB
+head(IC_monte[order(RankStat,decreasing=TRUE)])
+
+
+
+
+
+
+
 for(i in 1:length(quarters)){
   bayes_result_final[[paste("BCPNN - Quarter: ",quarters[i], sep="")]] <- list(bayes_result[[i]]$ALLSIGNALS)
 }
 
-bayes_result[[100]]$ALLSIGNALS
+bayes_result[[2]]$ALLSIGNALS
 head(bayes_table[[2]])
 str(bayes_result_final)
-head(bayes_table[[1]]$data)
+head(bayes_result_final[[2]])
 head(bayes_table[[1]]$L)
 ex <- cbind(head(bayes_table[[1]]$L),head(bayes_table[[1]]$data))
 
@@ -99,17 +126,18 @@ for(i in 1:length(quarters)){
 
 str(bayes_table)
 
-# merge all elements in bayes_PRR_result_final list
+# merge all elements in bayes_result_final list
 bayes_result_all <-  ldply(bayes_result_final, data.frame)
 
 # change ID variable to just quarter and make event.effect to upper case
 bayes_result_all$.id <- str_sub(bayes_result_all$.id,-6,-1)
 bayes_result_all$event.effect <- toupper(bayes_result_all$event.effect)
+bayes_result_all <- bayes_result_all %>% select(-quarter)
 
 head(bayes_result_all)
 tail(bayes_result_all)
 bayes_result_all[1:100,]
-save(bayes_result_all, file="BCPNN_0712.RData")
+save(bayes_result_all, file="BCPNN_0729.RData")
 
 
 # D*AR paris with vaccine
@@ -284,7 +312,7 @@ save(bayes_ROR_result_all, file="bayes_ROR_result_all0714.RData")
 
 # write table to database
 testconnect <- dbConnect(PostgreSQL(),host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
-dbWriteTable(testconnect, "cv_bcpnn_160712", bayes_result_all)
+dbWriteTable(testconnect, "cv_bcpnn_160729", bayes_result_all)
 dbWriteTable(testconnect, "cv_prr_160713", bayes_PRR_result_all)
 dbWriteTable(testconnect, "cv_ror_160714", bayes_ROR_result_all)
 
@@ -340,9 +368,9 @@ str(bayes_cumulative_result)
 bayes_cumulative_result[[2]]$ALLSIGNALS
 
 # bayes_cumulative_table VS. bayes_table
-DATA <- bayes_table[[2]]$data
-N <- bayes_table[[2]]$N
-L <- bayes_table[[2]]$L
+DATA <- bayes_table[[201]]$data
+N <- bayes_table[[201]]$N
+L <- bayes_table[[201]]$L
 
 n11 <- DATA[,1]
 n1. <- DATA[,2] 
@@ -412,16 +440,18 @@ for(i in 1:length(quarters)){
 }
 
 ################################################## Instead of using cumulative count of D*AR pair, plot cumulative IC ##################################################################
-cv_bcpnn <- tbl(hcopen, "cv_bcpnn_160712")%>% as.data.frame()
+hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+cv_bcpnn <- tbl(hcopen, "cv_bcpnn_160729")%>% as.data.frame()
 head(cv_bcpnn)
 
-cv_bcpnn_cumulative <- cv_bcpnn %>% group_by(drug.code,event.effect) %>% mutate(Q_0.025.log.IC.._C = cumsum(Q_0.025.log.IC..)) 
+cv_bcpnn_cumulative <- cv_bcpnn %>% group_by(drug.code,event.effect) %>% mutate(IC = cumsum(IC)) 
 df <- cv_bcpnn_cumulative %>% filter(drug.code == "PENICILLIN V", event.effect == "RASH")
 df <- cv_bcpnn_cumulative %>% filter(drug.code == "OXYCODONE HYDROCHLORIDE", event.effect == "DRUG DEPENDENCE")
+df1 <- cv_bcpnn%>% filter(drug.code == "OXYCODONE HYDROCHLORIDE", event.effect == "DRUG DEPENDENCE")
 
 
 p <- df %>%
-  ggplot(aes(x = `.id`, y = `Q_0.025.log.IC.._C`,group = 1)) +
+  ggplot(aes(x = `.id`, y = IC,group = 1)) +
   geom_line() + geom_point()  + 
   ggtitle("plottitle") + 
   xlab("Quarter") + 
