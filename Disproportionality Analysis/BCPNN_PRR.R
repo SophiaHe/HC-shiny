@@ -75,6 +75,7 @@ for(i in 1:length(quarters)){
   #bayes_result_final[[paste("BCPNN - Quarter: ",quarters[i], sep="")]] <- list(bayes_result[[i]]$ALLSIGNALS)
 }
 
+# BCPNN_SHe is to include IC results in the final output
 for(i in 199:201){
   bayes_result[i] <- list(BCPNN_SHe(bayes_table[[i]], RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE))
 }
@@ -318,10 +319,10 @@ dbWriteTable(testconnect, "cv_ror_160714", bayes_ROR_result_all)
 
 dbRemoveTable(testconnect, "test")
 
-############################################## Cumulative BCPNN ##############################################################
+############################################## Cumulative BCPNN (too many NA for IC) ##############################################################
 # create lists
 bayes_cumulative_table1 <- vector(mode = "list") # as.PhVid_SHe for each quarter of frequency table
-bayes_cumulative_table <- vector(mode = "list") # calculate cumulative n11, n1. & n.1 & format it into a list fro BCPNN process
+bayes_cumulative_table <- vector(mode = "list")
 bayes_cumulative_result <- vector(mode = "list") # BCPNN on each bayes_table
 bayes_cumulative_result_final <- vector(mode = "list") # ALLSIGNALS of each bayes_result
 
@@ -368,9 +369,9 @@ str(bayes_cumulative_result)
 bayes_cumulative_result[[2]]$ALLSIGNALS
 
 # bayes_cumulative_table VS. bayes_table
-DATA <- bayes_table[[201]]$data
-N <- bayes_table[[201]]$N
-L <- bayes_table[[201]]$L
+DATA <- bayes_table[[178]]$data
+N <- bayes_table[[178]]$N
+L <- bayes_table[[178]]$L
 
 n11 <- DATA[,1]
 n1. <- DATA[,2] 
@@ -421,9 +422,14 @@ for (m in 1 : length(n11)){
   LB[m] <- sort(IC_monte)[round(NB.MC * 0.025)] # -1.785071
 }
 
-a <- sort(IC_monte)
-a1 <- a[round(NB.MC * 0.025)]
+RankStat <- LB
+IC_monte[order(RankStat,decreasing=TRUE)] #  what does this step do????????????
 
+a <- c(1:20)
+a1 <- c(1,2)
+b <- a[order(a1, decreasing = TRUE)]
+b
+a[1]
 
 ############################################################################################################################################
 NB.MC = 10000
@@ -441,17 +447,21 @@ for(i in 1:length(quarters)){
 
 ################################################## Instead of using cumulative count of D*AR pair, plot cumulative IC ##################################################################
 hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
+# cv_bcpnn_160729 is with IC column
 cv_bcpnn <- tbl(hcopen, "cv_bcpnn_160729")%>% as.data.frame()
 head(cv_bcpnn)
+cv_bcpnn %>% filter(.id == 2009.2, drug.code == "OXYCODONE HYDROCHLORIDE", event.effect == "DRUG DEPENDENCE")
 
-cv_bcpnn_cumulative <- cv_bcpnn %>% group_by(drug.code,event.effect) %>% mutate(IC = cumsum(IC)) 
+
+
+cv_bcpnn_cumulative <- cv_bcpnn %>% group_by(drug.code,event.effect) %>% mutate(IC = cumsum(IC), Q_IC = cumsum(Q_0.025.log.IC..)) 
+# why NA in IC???????
 df <- cv_bcpnn_cumulative %>% filter(drug.code == "PENICILLIN V", event.effect == "RASH")
-df <- cv_bcpnn_cumulative %>% filter(drug.code == "OXYCODONE HYDROCHLORIDE", event.effect == "DRUG DEPENDENCE")
+df <- cv_bcpnn_cumulative %>% filter(drug.code == "NICOTINE", event.effect == "CHEST PAIN")
 df1 <- cv_bcpnn%>% filter(drug.code == "OXYCODONE HYDROCHLORIDE", event.effect == "DRUG DEPENDENCE")
 
-
 p <- df %>%
-  ggplot(aes(x = `.id`, y = IC,group = 1)) +
+  ggplot(aes(x = `.id`, y = Q_IC,group = 1)) +
   geom_line() + geom_point()  + 
   ggtitle("plottitle") + 
   xlab("Quarter") + 
