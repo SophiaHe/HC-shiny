@@ -45,8 +45,8 @@ bcpnn_signals <- cv_bcpnn %>% filter( `Q_0.025.log.IC..` >= 0.05)
 prr_signals <- cv_prr %>% filter(`LB95.log.PRR..` >=1, count >1)
 
 #Oxycodone (ing= OXYCODONE HYDROCHLORIDE) -drug dependence & + DRUG WITHDRAWL SYDROME
-# pioglitazone- bladder cance
-#captopril (check spelling) and cough
+# PIOGLITAZONE + BLADDER CANCER
+#CAPTOPRIL + COUGH
 # PENICILLIN V + RASH
 # MEPERIDINE HYDROCHLORIDE + NAUSEA
 # IRON + BACK PAIN in BCPNN
