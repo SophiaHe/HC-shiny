@@ -76,12 +76,16 @@ for(i in 1:length(quarters)){
 }
 
 # BCPNN_SHe is to include IC results in the final output
-for(i in 199:201){
-  bayes_result[i] <- list(BCPNN_SHe(bayes_table[[i]], RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE))
+for(i in 146:201){
+  bayes_result[i] <- list(BCPNN_SHe(bayes_table[[i]], RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE, NB.MC = 100000))
 }
 
+
+
 test <-  vector(mode = "list")
-test[1] <- list(BCPNN_SHe(bayes_table[[201]], RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE))
+test[1] <- list(BCPNN_SHe(bayes_table[[178]], RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE,NB.MC = 100000))
+is.na(test[[1]]$ALLSIGNALS$IC) == TRUE
+bayes_result[[116]]$NB.SIGNALS
 
 post.H0 <- vector(length=length(n11))
 LB <- vector(length=length(n11))
@@ -138,7 +142,7 @@ bayes_result_all <- bayes_result_all %>% select(-quarter)
 head(bayes_result_all)
 tail(bayes_result_all)
 bayes_result_all[1:100,]
-save(bayes_result_all, file="BCPNN_0729.RData")
+save(bayes_result_all, file="BCPNN_0805.RData")
 
 
 # D*AR paris with vaccine
@@ -313,12 +317,25 @@ save(bayes_ROR_result_all, file="bayes_ROR_result_all0714.RData")
 
 # write table to database
 testconnect <- dbConnect(PostgreSQL(),host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
-dbWriteTable(testconnect, "cv_bcpnn_160729", bayes_result_all)
+dbWriteTable(testconnect, "cv_bcpnn_160805", bayes_result_all)
 dbWriteTable(testconnect, "cv_prr_160713", bayes_PRR_result_all)
 dbWriteTable(testconnect, "cv_ror_160714", bayes_ROR_result_all)
 
 dbRemoveTable(testconnect, "test")
 
+bayes_gps_result <- vector(mode = "list")
+
+for(i in 1:length(quarters)){
+  bayes_gps_result[i] <- list(ROR(bayes_table[[i]], OR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0, RANKSTAT = 2))
+  # bayes_ROR_result_final[[paste("ROR - Quarter: ",quarters[i], sep="")]] <- list(bayes_ROR_result[[i]]$ALLSIGNALS)
+}
+
+bayes_gps_result[1] <- list(GPS(bayes_table[[1]], RR0 = 1, MIN.n11 = 1, DECISION = 1, DECISION.THRES = 0.05,
+                                RANKSTAT = 3, TRONC = FALSE, TRONC.THRES = 1,
+                                PRIOR.INIT = c(alpha1 = 0.2, beta1 = 0.06, alpha2 = 1.4,
+                                               beta2 = 1.8, w = 0.1), PRIOR.PARAM = NULL))
+head(bayes_gps_result[[1]]$ALLSIGNALS)
+head(bayes_gps_result[[1]]$PARAM)
 ############################################## Cumulative BCPNN (too many NA for IC) ##############################################################
 # create lists
 bayes_cumulative_table1 <- vector(mode = "list") # as.PhVid_SHe for each quarter of frequency table
@@ -330,18 +347,26 @@ bayes_cumulative_result_final <- vector(mode = "list") # ALLSIGNALS of each baye
 for(i in 1:length(quarters)){
   bayes_cumulative_table1[[i]] <- as.PhVid_CUM1_SHe(data=as.data.frame(DISP_table[i]),MARGIN.THRES = 1)
 }
-bayes_cumulative_table1[[4]]
+bayes_cumulative_table1[[2]]
 
 # merge elements of bayes_cumulative_table1 list together
 bayes_cumulative_table1_all <-  ldply(bayes_cumulative_table1, data.frame)
 
 # calculate cumulative n11, n1. & n.1
-bayes_cumulative_table_final <- bayes_cumulative_table1_all %>% group_by(ing,PT_NAME_ENG) %>% mutate(n11_cum = cumsum(n11), n1._cum = cumsum(n1.), n.1_cum = cumsum(n.1)) %>%
-                                select(quarter, ing, PT_NAME_ENG,n11_cum,n1._cum,n.1_cum) %>% dplyr::rename(n11 = n11_cum, n1. = n1._cum, n.1 = n.1_cum)
+bayes_cumulative_table_final <- bayes_cumulative_table1_all %>% 
+  group_by(ing,PT_NAME_ENG) %>% mutate(n11_cum = cumsum(n11), n1._cum = cumsum(n1.), n.1_cum = cumsum(n.1)) %>%
+  select(quarter, ing, PT_NAME_ENG,n11_cum,n1._cum,n.1_cum) %>% dplyr::rename(n11 = n11_cum , n1. = n1._cum ,  n.1 = n.1_cum )
+                                
 bayes_cumulative_table_final <- bayes_cumulative_table_final  %>% ungroup(ing, PT_NAME_ENG)
+bayes_cumulative_table_final$PT_NAME_ENG <- toupper(bayes_cumulative_table_final$PT_NAME_ENG)
+head(bayes_cumulative_table_final)
 
-# a <- bayes_cumulative_table_final[bayes_cumulative_table_final$ing == "INDINAVIR" & bayes_cumulative_table_final$PT_NAME_ENG == "Nausea",]
-# a
+# select(quarter, ing, PT_NAME_ENG,n11_cum,n1._cum,n.1_cum) %>% dplyr::rename(n11_cum = n11, n1._cum = n1. ,  n.1_cum =n.1 )
+
+# the reason why N - n1._cum or N - n.1_cum are negative is that n11 is much smaller than n1._cum and n.1_cum. 
+ a <- bayes_cumulative_table_final[bayes_cumulative_table_final$ing == "AMPICILLIN" & bayes_cumulative_table_final$PT_NAME_ENG == "RASH",]
+a <- bayes_cumulative_table_final %>% filter(ing == "AMPICILLIN" & PT_NAME_ENG == "RASH" )
+a
 
 # format bayes_cumulative_table_final into a list (bayes_cumulative_table) for BCPNN process
 bayes_cumulative_table <- vector(mode = "list")
@@ -363,15 +388,24 @@ for(i in 1:50){
 # when conducting Monte Carlo simulation, N - n1. and N - n.1 are used as parameters which can produce negative value. 
 # MC Simulation includes random generation from the Dirichlet distribution (using rdirichlet which uses random generation of Gamma Distribution),
 # the shape and scale parameters for such generation CANNOT be negative. 
+# the reason why N - n1._cum or N - n.1_cum are negative is that n11 is much smaller than n1._cum and n.1_cum. 
+
+cumulative <- bayes_cumulative_table1_all %>% 
+  group_by(ing,PT_NAME_ENG) %>% mutate(n11_cum = cumsum(n11), n1._cum = cumsum(n1.), n.1_cum = cumsum(n.1))
+cumulative <- cumulative  %>% ungroup(ing, PT_NAME_ENG)
+cumulative$PT_NAME_ENG <- toupper(cumulative$PT_NAME_ENG)
+head(cumulative)
 
 
 str(bayes_cumulative_result)
 bayes_cumulative_result[[2]]$ALLSIGNALS
 
 # bayes_cumulative_table VS. bayes_table
-DATA <- bayes_table[[178]]$data
-N <- bayes_table[[178]]$N
-L <- bayes_table[[178]]$L
+DATA <- bayes_cumulative_table[[2]]$data
+N <- bayes_cumulative_table[[2]]$N
+L <- bayes_cumulative_table[[2]]$L
+
+sum(DATA$n11)
 
 n11 <- DATA[,1]
 n1. <- DATA[,2] 
@@ -423,13 +457,17 @@ for (m in 1 : length(n11)){
 }
 
 RankStat <- LB
-IC_monte[order(RankStat,decreasing=TRUE)] #  what does this step do????????????
+IC_monte[order(RankStat,decreasing=TRUE)] #  HERE is why NA is produced in IC in ALLSIGNALS:
+test <- order(RankStat,decreasing=TRUE) # gives the index for IC_monte, but length of test (14923) is greater than length of IC(10000), thus NA is produced
+head(test)
+head(IC_monte[order(RankStat,decreasing=TRUE)])
 
-a <- c(1:20)
-a1 <- c(1,2)
-b <- a[order(a1, decreasing = TRUE)]
+
+a <- c(30:50)
+a1 <- c(1,20,15)
+b <- a[order(a1, decreasing = TRUE)] # order(a1, decreasing = TRUE) gives index for a
 b
-a[1]
+a[3:1]
 
 ############################################################################################################################################
 NB.MC = 10000
@@ -447,21 +485,22 @@ for(i in 1:length(quarters)){
 
 ################################################## Instead of using cumulative count of D*AR pair, plot cumulative IC ##################################################################
 hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
-# cv_bcpnn_160729 is with IC column
-cv_bcpnn <- tbl(hcopen, "cv_bcpnn_160729")%>% as.data.frame()
+# cv_bcpnn_160729 is with IC column but with NA
+# cv_bcpnn_160805 is with IC column but without NA
+cv_bcpnn <- tbl(hcopen, "cv_bcpnn_160805")%>% as.data.frame()
 head(cv_bcpnn)
 cv_bcpnn %>% filter(.id == 2009.2, drug.code == "OXYCODONE HYDROCHLORIDE", event.effect == "DRUG DEPENDENCE")
 
 
 
-cv_bcpnn_cumulative <- cv_bcpnn %>% group_by(drug.code,event.effect) %>% mutate(IC = cumsum(IC), Q_IC = cumsum(Q_0.025.log.IC..)) 
-# why NA in IC???????
+cv_bcpnn_cumulative <- cv_bcpnn %>% group_by(drug.code,event.effect) %>% mutate(IC_Cumulative = cumsum(IC), Q_IC_Cumulative = cumsum(Q_0.025.log.IC..)) 
+
 df <- cv_bcpnn_cumulative %>% filter(drug.code == "PENICILLIN V", event.effect == "RASH")
 df <- cv_bcpnn_cumulative %>% filter(drug.code == "NICOTINE", event.effect == "CHEST PAIN")
-df1 <- cv_bcpnn%>% filter(drug.code == "OXYCODONE HYDROCHLORIDE", event.effect == "DRUG DEPENDENCE")
+df <- cv_bcpnn_cumulative%>% filter(drug.code == "OXYCODONE HYDROCHLORIDE", event.effect == "DRUG DEPENDENCE")
 
 p <- df %>%
-  ggplot(aes(x = `.id`, y = Q_IC,group = 1)) +
+  ggplot(aes(x = `.id`, y = IC_Cumulative,group = 1)) +
   geom_line() + geom_point()  + 
   ggtitle("plottitle") + 
   xlab("Quarter") + 
