@@ -18,7 +18,7 @@ library(wordcloud)
 
 hcopen <- src_postgres(host = "shiny.hc.local", user = "hcreader", dbname = "hcopen", password = "canada1")
 cv_prr <- tbl(hcopen, "cv_prr_160713") %>% as.data.frame()
-cv_bcpnn <- tbl(hcopen, "cv_bcpnn_160712")%>% as.data.frame()
+cv_bcpnn <- tbl(hcopen, "cv_bcpnn_160805")%>% as.data.frame()
 cv_ror <- tbl(hcopen, "cv_ror_160714") %>% as.data.frame()
 
 
@@ -61,8 +61,8 @@ prr_signals <- cv_prr %>% filter(`LB95.log.PRR..` >=1, count >1)
 #topdrugs <- cv_prr %>% distinct(drug.code) %>% as.data.frame()
 #toprxns <- cv_prr %>% distinct(event.effect) %>% as.data.frame()
 
-topdrugs <- cv_prr %>% dplyr::distinct(drug.code)%>% dplyr::top_n(2000) %>% as.data.frame()
-toprxns <- cv_prr %>% semi_join(topdrugs) %>% dplyr::distinct(event.effect)%>% as.data.frame()
+topdrugs <- cv_prr %>% dplyr::distinct(drug.code) %>% as.data.frame()
+# toprxns <- cv_prr %>% semi_join(topdrugs) %>% dplyr::distinct(event.effect)%>% as.data.frame()
 quarters <- levels(as.factor(cv_prr$`.id`))
 
 #%>% dplyr::top_n(2000)
@@ -122,6 +122,7 @@ ui <- dashboardPage(
                   tags$p("Proportional Reporting Ratio (PRR) results by quarter. 
                           Value of PRR indicates the signal strength of the particular Drug & Adverse_reaction pair. 
                           Details can be found in DISP_about documentation"),
+                  dataTableOutput("Rxn_table_prr"),
                   width = 12), 
                   
                   tabPanel(
@@ -138,6 +139,7 @@ ui <- dashboardPage(
                     tags$p("This Word Cloud demonstrates Top20 Adverse Events Related to Selected Drug Based on Event Frequency During Selected Time Range. 
                            The size of the words are proportional to the number of occurence of that adverse event.")
                   ),
+                  
                 width=12
                 )
               )
@@ -153,6 +155,8 @@ ui <- dashboardPage(
                     tags$p("Information Component (IC) results by quarter. 
                           Value of IC indicates the signal strength of the particular Drug & Adverse_reaction pair. 
                           Details can be found in DISP_about documentation"),
+                    plotlyOutput(outputId = "bcpnn_timeplot_cumulative"),
+                    dataTableOutput("Rxn_table_bcpnn"),
                     width = 12), 
                   
                   tabPanel(
@@ -186,6 +190,7 @@ ui <- dashboardPage(
                     tags$p("Reporting Odds Ratio (ROR) results by quarter. 
                           Value of ROR indicates the signal strength of the particular Drug & Adverse_reaction pair. 
                           Details can be found in DISP_about documentation"),
+                    dataTableOutput("Rxn_table_ror"),
                     width = 12), 
                   
                   tabPanel(
@@ -208,42 +213,6 @@ ui <- dashboardPage(
               )
       ),
       
-
-      # tabItem(tabName = "downloaddata",
-      #         fluidRow(
-      #           box(
-      #             title = tags$h2("Download Dataset for Disproportionality Analysis"),
-      #             dateRangeInput("searchDateRange_DISP",
-      #                            "Date Range",
-      #                            start = "1965-01-01",
-      #                            end = Sys.Date(),
-      #                            startview = "year",
-      #                            format = "yyyy-mm-dd"),
-      #             actionButton("searchDISPButton", "Search"),
-      #             tableOutput("current_DISP_search"),
-      #             tableOutput("current_DISP_size"),
-      #             downloadButton('downloadData_DISP', 'Download')
-      #           ),
-      #           
-      #           box(
-      #             tags$h2("Download Data Used for Current Searched Combination"),
-      #             tags$h3("Please select an information category: "),
-      #             selectizeInput("search_dataset_type",
-      #                            "Information Category",
-      #                            choices = c("Report Info", "Drug Info", "Reaction Info"),  
-      #                            options = list(create = TRUE,
-      #                                           placeholder = 'Please select an option below',
-      #                                           onInitialize = I('function() { this.setValue(""); }'))),
-      #             actionButton("search_report_type_dl","Go"),
-      #             tableOutput("download_reports_type"),
-      #             tableOutput("download_reports_size"),
-      #             downloadButton('download_reports', 'Download')
-      #           )
-      #           # box(plotOutput("drugplot"),
-      #           #     tags$br(),
-      #           #     tags$p("This plot includes top_10 most-reported drugs with most-reported indication assocaiated with the seached drug."), width = 4)
-      #         )
-      # ),
       tabItem(tabName = "aboutinfo",
               tags$h2("About the Shiny App"),
               tags$p("This is a prototyping platform to utilize open data sources (e.g. Canada Vigilance Adverse Reaction Online Database) 
@@ -283,39 +252,41 @@ options(shiny.trace = TRUE, shiny.reactlog=TRUE)
 
 ############################# Server of DISP Shiny #####################
 server <- function(input, output, session) {
-
+  menu_options <- reactive({if(is.na(input$search_generic) == TRUE){
+    drug_option <- "OXYCODONE HYDROCHLORIDE"
+  } else {
+    drug_option <- input$search_generic 
+  }
+    
+    
+    # adverse events available 
+    event_option <- cv_prr %>% dplyr::filter(drug.code == drug_option) %>% dplyr::distinct(event.effect) %>% dplyr::select(event.effect) #%>% arrange(event.effect)
+    
+    # quarters avaiable
+    quarter_option <- cv_prr %>% dplyr::filter(drug.code == drug_option) %>% dplyr::distinct(.id) %>% dplyr::select(.id)
+    
+    return(
+      list(event_option <- event_option,
+           quarter_option <- quarter_option)
+    )
+  })
+  
   # Design Reaction Dropdown Menu based on Drug selection
   observe({
-    if(is.na(input$search_generic) == TRUE){
-      drug_option <- "OXYCODONE HYDROCHLORIDE"
-    } else {
-      drug_option <- input$search_generic 
-    }
+    updateSelectInput(session, "search_rxn",
+                      label = "Select Adverse Event:",
+                      choices = as.data.frame(menu_options()[1])$event.effect)
     
-    # if(is.na(input$search_rxn) == TRUE){
-    #   current_rxn <- "DRUG DEPENDENCE"
-    # } else {
-    #   current_rxn <- input$search_rxn
-    # }
-        
-      # adverse events available 
-      event_option <- cv_prr %>% dplyr::filter(drug.code == drug_option) %>% dplyr::distinct(event.effect) %>% dplyr::select(event.effect) #%>% arrange(event.effect)
-      
-      updateSelectInput(session, "search_rxn",
-                        label = "Select Adverse Event:",
-                        choices = event_option)
-      
-      # quarters avaiable
-      quarter_option <- cv_prr %>% dplyr::filter(drug.code == drug_option) %>% dplyr::distinct(.id) %>% dplyr::select(.id)
-      
-      updateSelectInput(session, "start_quarter",
-                        label = "Display Results Starting From (Quarterly): ",
-                        choices = quarter_option)
-      
-      updateSelectInput(session, "end_quarter",
-                        label = "Display Results Ending At (Quarterly): ",
-                        choices = quarter_option)
-      
+    
+    
+    updateSelectInput(session, "start_quarter",
+                      label = "Display Results Starting From (Quarterly): ",
+                      choices = as.data.frame(menu_options()[2])$.id)
+    
+    updateSelectInput(session, "end_quarter",
+                      label = "Display Results Ending At (Quarterly): ",
+                      choices = as.data.frame(menu_options()[2])$.id)
+    
   })
   
   # PRR tab 
@@ -340,6 +311,7 @@ server <- function(input, output, session) {
     
     prr_tab_df <- cv_prr %>% filter(drug.code == current_drug, event.effect == current_rxn, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter))
     prr_tab_wc <- cv_prr %>% filter(drug.code == current_drug, as.numeric(.id) >= as.numeric(start_quarter), as.numeric(.id) <= as.numeric(end_quarter))  
+    #prr_tab_rxn <- cv_prr %>% 
     
     return(list(prr_tab_df <- prr_tab_df,
                 prr_tab_wc <- prr_tab_wc))
@@ -390,6 +362,12 @@ server <- function(input, output, session) {
     wordcloud::wordcloud(words = data2$event.effect, freq = data2$count, scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
   })
   
+  # PRR Tab: Reactions based on PRR associated with selected drug
+  output$Rxn_table_prr <- renderDataTable({
+    df <- as.data.frame(cv_prr_tab()[2]) 
+    data <- df %>% filter(PRR < 99999.99) %>% arrange(desc(PRR)) %>% select(-c(row.names,FDR))
+    data
+  })
 
   ###################### BCPNN Tab #######################
   cv_bcpnn_tab <- reactive({
@@ -429,22 +407,47 @@ server <- function(input, output, session) {
     plottitle <- paste("Non-Cumulative Information Component (IC) Time Plot for:", current_drug, "&", current_rxn)
     
     p <- df %>%
-      ggplot(aes(x = `.id`, y = `Q_0.025.log.IC..`,group = 1)) +
+      ggplot(aes(x = `.id`, y = `IC`,group = 1)) +
       geom_line() + geom_point()  + 
       ggtitle(plottitle) + 
       xlab("Quarter") + 
-      ylab("2.5% Quantile of Posterior Distribution of IC") +
+      ylab("Information Component (IC)") +
       theme_bw() +
       theme(plot.title = element_text(lineheight=.8, face="bold"), axis.text.x = element_text(angle=90, vjust=1))
     ggplotly(p)
   })
   
+  # cumulative time plot
+  output$bcpnn_timeplot_cumulative <- renderPlotly({
+    df <- as.data.frame(cv_bcpnn_tab()[1])
+    df1 <- df %>% group_by(drug.code,event.effect) %>% mutate(IC_Cumulative = cumsum(IC)) 
+    
+    current_drug <- isolate(ifelse(input$search_generic == "",
+                                   "OXYCODONE HYDROCHLORIDE",
+                                   input$search_generic))
+    current_rxn <- isolate(ifelse(input$search_rxn == "",
+                                  "DRUG DEPENDENCE",
+                                  input$search_rxn))
+    plottitle <- paste("Cumulative Information Component (IC) Time Plot for:", current_drug, "&", current_rxn)
+    
+    p <- df1 %>%
+      ggplot(aes(x = `.id`, y = `IC_Cumulative`,group = 1)) +
+      geom_line() + geom_point()  + 
+      ggtitle(plottitle) + 
+      xlab("Quarter") + 
+      ylab("Cumulative Information Component (IC)") +
+      theme_bw() +
+      theme(plot.title = element_text(lineheight=.8, face="bold"), axis.text.x = element_text(angle=90, vjust=1))
+    ggplotly(p)
+  })
+  
+  
   # BCPNN Tab: Event wordcloud based on IC
   output$bcpnn_event_ICwordcloud <- renderPlot({
     df <- as.data.frame(cv_bcpnn_tab()[2])
     
-    data <- df %>% arrange(desc(Q_0.025.log.IC..)) %>% dplyr::select(event.effect,`Q_0.025.log.IC..` ) %>% slice(1:20)
-    wordcloud::wordcloud(words = data$event.effect, freq = data$Q_0.025.log.IC.., scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
+    data <- df %>% arrange(desc(IC)) %>% dplyr::select(event.effect,`IC` ) %>% slice(1:20)
+    wordcloud::wordcloud(words = data$event.effect, freq = data$IC, scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
   })
   
   # BCPNN Tab: Event wordcloud based on adverse event frequency
@@ -455,7 +458,12 @@ server <- function(input, output, session) {
     wordcloud::wordcloud(words = data2$event.effect, freq = data2$count, scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
   })
   
-
+  # BCPNN Tab: Reactions based on IC associated with selected drug
+  output$Rxn_table_bcpnn <- renderDataTable({
+    df <- as.data.frame(cv_bcpnn_tab()[2]) 
+    data <- df %>% arrange(desc(IC)) %>% select(-c(row.names,drug.code,expected.count,Se,Sp))
+    data
+  })
   
   # ROR Tab
   cv_ror_tab <- reactive({
@@ -521,7 +529,12 @@ server <- function(input, output, session) {
     wordcloud::wordcloud(words = data2$event.effect, freq = data2$count, scale = c(1.5, 0.2), colors=brewer.pal(8, "Dark2"))
   })
   
-
+  # ROR Tab: Reactions based on ROR associated with selected drug
+  output$Rxn_table_ror <- renderDataTable({
+    df <- as.data.frame(cv_ror_tab()[2]) 
+    data <- df %>% arrange(desc(ROR)) %>% select(-c(row.names,FDR))
+    data
+  })
   
 }
 shinyApp(ui, server)
