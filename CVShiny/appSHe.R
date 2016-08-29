@@ -64,7 +64,7 @@ topingd_func <- function(n){
   cv_report_drug_dm <- cv_report_drug %>% dplyr::select(DRUG_PRODUCT_ID,REPORT_ID)
   
   topingd <-  dplyr::summarise(group_by(inner_join(cv_report_drug_dm,cv_drug_product_ingredients_dm),ACTIVE_INGREDIENT_NAME),count=n_distinct(REPORT_ID))%>%
-    as.data.table(n=-1)
+    as.data.frame(n=-1)
   topingd_final <-  topingd %>% dplyr::arrange(desc(count)) %>% top_n(n) %>% dplyr::select(ACTIVE_INGREDIENT_NAME)
   return(topingd_final)
 }
@@ -72,7 +72,7 @@ topingd_func <- function(n){
 topdrug_func <- function(n){
   cv_report_drug_dm <- cv_report_drug %>% dplyr::select(REPORT_ID, DRUGNAME)
   
-  topdrugs <- dplyr::summarise(group_by(cv_report_drug_dm, DRUGNAME),count=n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
+  topdrugs <- dplyr::summarise(group_by(cv_report_drug_dm, DRUGNAME),count=n_distinct(REPORT_ID)) %>% as.data.frame(n=-1)
   topdrugs_final <- topdrugs %>% arrange(desc(count)) %>% top_n(n) %>% dplyr::select(DRUGNAME)
   
   return(topdrugs_final)
@@ -81,7 +81,7 @@ topdrug_func <- function(n){
 toprxn_func <- function(n){
   cv_reactions_dm <- cv_reactions %>% dplyr::select(REPORT_ID, PT_NAME_ENG)
   
-  toprxn <- dplyr::summarise(group_by(cv_reactions_dm, PT_NAME_ENG),count=n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
+  toprxn <- dplyr::summarise(group_by(cv_reactions_dm, PT_NAME_ENG),count=n_distinct(REPORT_ID)) %>% as.data.frame(n=-1)
   toprxn_final <- toprxn %>% dplyr::arrange(desc(count)) %>% top_n(n) %>% dplyr::select(PT_NAME_ENG)
   
   return(toprxn_final)
@@ -896,12 +896,12 @@ server <- function(input, output) {
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
       dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
     
-    DISP_final <- dplyr::summarise(group_by(semi_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
+    DISP_final <- dplyr::summarise(group_by(semi_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.frame(n=-1)
     
     bayes_table <- as.PhViD(DISP_final, MARGIN.THRES = 1) 
     bayes_result <- BCPNN(bayes_table, RR0 = 1, MIN.n11 = 3, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=FALSE)
     
-    signals <- as.data.table(bayes_result$SIGNAL) 
+    signals <- as.data.frame(bayes_result$SIGNAL) 
     signals_final <- signals %>% mutate(D_AR_Comb = paste(signals$`drug code`, " * ", signals$`event effect`))
     return(signals_final)
   })
@@ -920,7 +920,7 @@ server <- function(input, output) {
       filter(DATINTRECEIVED_CLEAN >= current_date_range[1], DATINTRECEIVED_CLEAN <= current_date_range[2]) %>%
       dplyr::select(REPORT_ID,DATINTRECEIVED_CLEAN) #%>% as.data.table(n=-1)
     
-    DISP_final <- dplyr::summarise(group_by(semi_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.table(n=-1)
+    DISP_final <- dplyr::summarise(group_by(semi_join(part1,part2),ACTIVE_INGREDIENT_NAME,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.frame(n=-1)
     
     bayes_table_PRR <- as.PhViD(DISP_final, MARGIN.THRES = 1) 
     
