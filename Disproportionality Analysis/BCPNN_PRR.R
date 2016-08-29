@@ -35,12 +35,208 @@ ID_NA_c3 # 637 REPORT_ID of reports that are in cv_reports but not in cv_reactio
 cv_reactions[cv_reactions$REPORT_ID == 86,]
 cv_reports[cv_reports$REPORT_ID == 86,]
 
-################################################ Disproportionality analysis (new) using BCPNN ###############################################
+################################################ Disproportionality analysis (ALL_2016.08.22) ###############################################
+cv_drug_rxn_2006 <- cv_drug_rxn %>% filter(quarter >= 2006.1)
+count_df <- dplyr::summarise(group_by(cv_drug_rxn_2006,ing,PT_NAME_ENG), count = n_distinct(REPORT_ID)) %>% as.data.frame(n=-1)
+
+count_df_quarter <- dplyr::summarise(group_by(cv_drug_rxn_2006,ing,PT_NAME_ENG,quarter), count = n_distinct(REPORT_ID)) %>% as.data.frame()
+head(count_df_quarter)
+
+input_df <- vector(mode = "list")
+input_df <- as.PhVid_All_SHe(data=count_df,MARGIN.THRES = 1)
+
+as.PhVid_All_SHe <-  function(data, MARGIN.THRES=1){
+  RES2 <- vector(mode = "list")
+  
+  n1._df <- aggregate(count~ing,data,sum)  %>% dplyr::rename(n1. = count) %>% as.data.table(n=-1)#9223*2
+  n.1_df <- aggregate(count~PT_NAME_ENG,data,sum)%>% dplyr::rename(n.1 = count)%>% as.data.table(n=-1) # 3170*2
+  
+  
+  df <- data %>% dplyr::rename(n11 = count) 
+  output <- df %>% dplyr::left_join(n1._df) %>% filter(is.na(n1.) == FALSE)
+  output1 <- df %>% left_join(n.1_df)%>% filter(is.na(n.1) == FALSE)
+  
+  test <- output %>% left_join(output1)  
+  RES2$data  <- test %>% dplyr::filter(is.na(test$n.1)== FALSE & test$n1.>= MARGIN.THRES & test$n.1>= MARGIN.THRES) %>% dplyr::select(n11, n1., n.1)
+  
+  RES2$N <- sum(as.data.frame(RES2$data)$n11) 
+  
+  RES2$L <- test %>% dplyr::filter(is.na(test$n.1)== FALSE & test$n1.>= MARGIN.THRES & test$n.1>= MARGIN.THRES) %>% dplyr::select(ing,PT_NAME_ENG) %>% as.data.frame(n=-1)
+  return(RES2)
+}
+
+# IC
+NB.MC = 1000000
+DATA <- input_df$data
+N <- input_df$N
+L <- input_df$L
+
+n11 <- DATA[,1]
+n1. <- DATA[,2] 
+n.1 <- DATA[,3] 
+n10 <- n1. - n11
+n01 <- n.1 - n11
+n00 <- N - (n11+n10+n01)
+E <- n1. * n.1 / N # count the expected values
+
+Nb.Cell <- length(n11)
+if (MC == TRUE) { # Advanced option MC
+  require(MCMCpack)
+  n1. <- n11 + n10
+  n.1 <- n11 + n01
+  Nb_Obs <- length(n11)
+  
+  ## Nouvelles priors
+  q1. <- (n1. +.5)/(N +1)
+  q.1 <- (n.1 +.5)/(N +1)
+  q.0 <- (N - n.1 +.5)/(N +1)
+  q0. <- (N - n1. +.5)/(N +1)
+  
+  a.. <- .5/(q1.*q.1) ## le .5 devrait pouvoir être changé
+  
+  a11 <- q1.*q.1* a..
+  a10 <- q1.*q.0* a..
+  a01 <- q0.*q.1* a..
+  a00 <- q0.*q.0* a..
+  
+  g11 <- a11 + n11
+  g10 <- a10 + n10
+  g01 <- a01 + n01
+  g00 <- a00 + n00
+  g1. <- g11 + g10
+  g.1 <- g11 + g01
+  
+  post.H0 <- vector(length=length(n11))
+  LB <- vector(length=length(n11))
+  UB <- vector(length=length(n11))
+  quantile <- vector("numeric",length=length(n11))
+  for (m in 1 : length(n11)){
+    p <- rdirichlet(NB.MC,c(g11[m],g10[m],g01[m],g00[m]))
+    p11 <- p[,1]
+    p1. <- p11 + p[,2]
+    p.1 <- p11 + p[,3]	
+    IC_monte <- log(p11/(p1.* p.1))
+    temp <- IC_monte < log(RR0)
+    post.H0[m] <- sum(temp)/NB.MC
+    LB[m] <- sort(IC_monte)[round(NB.MC * 0.025)]
+    UB[m] <- sort(IC_monte)[round(NB.MC * 0.975)]
+  }
+  rm(p11,p1.,p.1,temp)
+  gc()
+}
+list1 <- vector(length=length(n11))
+list1[1] <- sort(IC_monte)[round(NB.MC * 0.025)]
+list1[235803]
+LB[235803]
+head(IC_monte)
+RANKSTAT = 2
+if (RANKSTAT==2) {RankStat <- LB 
+RankStat1 <- UB}
+
+test <- IC_monte[order(RankStat,decreasing=TRUE)]
+head(IC_monte)
+head(order(RankStat,decreasing=TRUE))
+
+if (RANKSTAT==2) {
+  FDR <- (cumsum(post.H0[order(LB,decreasing=TRUE)]) / (1:length(post.H0)))
+  FNR <- rev(cumsum((1-post.H0)[order(1-LB,decreasing=TRUE)])) / (Nb.Cell - 1:length(post.H0))
+  Se <- cumsum((1-post.H0)[order(LB,decreasing=TRUE)]) / (sum(1-post.H0))
+  Sp <- rev(cumsum(post.H0[order(1-LB,decreasing=TRUE)])) / (Nb.Cell - sum(1-post.H0))
+}
+
+
+RES <- vector(mode = "list")
+if (RANKSTAT==2) {
+  RES$ALLSIGNALS <- data.frame( L[,1][order(RankStat, decreasing=TRUE)],
+                                L[,2][order(RankStat, decreasing=TRUE)],
+                                n11[order(RankStat, decreasing=TRUE)],
+                                E[order(RankStat,decreasing=TRUE)],
+                                RankStat[order(RankStat,decreasing=TRUE)],
+                                RankStat1[order(RankStat1,decreasing=TRUE)],
+                                (n11/E)[order(RankStat,decreasing=TRUE)],
+                                n1.[order(RankStat,decreasing=TRUE)],
+                                n.1[order(RankStat,decreasing=TRUE)],
+                                FDR, FNR, Se, Sp,
+                                post.H0[order(RankStat,decreasing=TRUE)], IC_monte[order(RankStat,decreasing=TRUE)] )
+  colnames(RES$ALLSIGNALS) <- c("drug code","event effect","count","expected count","Q_0.025(log(IC))","Q_0.975(log(IC))",
+                                "n11/E","drug margin","event margin","FDR","FNR","Se","Sp","postH0", "IC")
+}
+names(RES)
+
+IC <- as.data.frame(RES$ALLSIGNALS)
+head(IC)
+sum(is.na(IC$IC)) # no NA in IC
+
+a <- LB[order(LB,decreasing=TRUE)]
+a[1]
+LB[1]
+UB[1]
+IC_monte[1]
+
+head(RES$ALLSIGNALS$IC)
+# upper CI still needs work!!!!!!!
+head(RES$ALLSIGNALS$`Q_0.975(log(IC))`)
+head(RES$ALLSIGNALS$`Q_0.025(log(IC))`)
+
+################################################ PRR (All 160823) ######################################################
+input_df
+PRR_result <- vector(mode = "list")
+PRR_result <- PRR(input_df, RR0=1, MIN.n11 = 1, DECISION = 3, DECISION.THRES = 0.05, RANKSTAT = 2)
+PRR <- as.data.frame(PRR_result$ALLSIGNALS)
+
+sum(is.na(PRR$PRR)) # no NA in PRR
+PRR_result$ALLSIGNALS$PRR[1:10]
+
+################################################ ROR (All 160823) ######################################################
+# In LBE function: 
+logROR <- log(n11 * n00 /(n10 * n01)) # In n11 * n00 : NAs produced by integer overflow In n10 * n01 : NAs produced by integer overflow
+which(is.na(logROR)) # 8369 115856 116598 NAs in those locations
+L[8369,] # ADALIMUMAB Drug ineffective
+L[115856,] #INFLIXIMAB Drug ineffective
+L[116598,] # INFLIXIMAB Infusion related reaction
+
+input_df$data[8369,]
+input_df$data[115856,]
+input_df$data[116598,]
+
+# input_df1 is the count dataset used for ROR to avoid NA generations
+input_df1 <- vector(mode = "list")
+input_df1$data <- input_df$data[-c(8369,115856,116598),]
+input_df1$L <- input_df$L[-c(8369,115856,116598),]
+input_df1$N <- input_df$N - 6368 - 1667 - 2500
+
+ROR_result <- vector(mode = "list")
+ROR_result <- ROR(input_df1, OR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0, RANKSTAT = 2)
+
+ROR <- as.data.frame(ROR_result$ALLSIGNALS)
+head(ROR)
+sum(is.na(ROR$ROR)) # no NA in ROR
+
+ROR <- mutate(ROR, logROR=log2(ROR))
+ROR <- mutate(ROR, UB95_logROR = qnorm(0.975,logROR,sqrt(var.logROR)))
+max(ROR$ROR) # the max of ROR is infinite and that's why we could use log ROR and its confidence interval
+################################################ RRR (All 160823) ######################################################
+DATA <- input_df1$data
+N <- input_df1$N
+L <- input_df1$L
+
+n11 <- DATA[,1]
+n1. <- DATA[,2] 
+n.1 <- DATA[,3] 
+
+RRR_result <- as.data.frame(n11*N / (n1.*n.1))
+RRR_result <- mutate(RRR_result, index = 1:235800)
+L <- mutate(L, index = 1:235800)
+RRR_result <- full_join(L, RRR_result) %>% select(-index) %>% rename(RRR = `n11 * N/(n1. * n.1)`)
+sum(is.na(RRR_result$RRR))
+
+head(RRR_result)
+################################################ Disproportionality analysis (Quarterly) using BCPNN ###############################################
 head(cv_subtances)
 head(cv_drug_rxn)
 str(cv_drug_rxn)
 cv_drug_rxn <- tbl(hcopen, "cv_drug_rxn")
-cv_drug_rxn <- cv_drug_rxn %>% as.data.table(n=-1)
+cv_drug_rxn <- cv_drug_rxn %>% as.data.table()
 # save(cv_drug_rxn, file = "cv_drug_rxn.RData")
 
 DISP <- cv_drug_rxn %>% filter(is.na(cv_drug_rxn$PT_NAME_ENG)==FALSE) %>% dplyr::group_by(quarter)%>% as.data.table(n=-1)
@@ -83,7 +279,7 @@ for(i in 146:201){
 
 
 test <-  vector(mode = "list")
-test[1] <- list(BCPNN_SHe(bayes_table[[178]], RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE,NB.MC = 100000))
+test <- BCPNN_SHe(input_df, RR0 = 1, MIN.n11 = 1, DECISION = 3,DECISION.THRES = 0.05, RANKSTAT = 2, MC=TRUE,NB.MC = 100000)
 is.na(test[[1]]$ALLSIGNALS$IC) == TRUE
 bayes_result[[116]]$NB.SIGNALS
 
@@ -515,7 +711,7 @@ ggplotly(p)
 MARGIN.THRES <- 3
 data <- as.data.frame(DISP_table[2])
 
-# Final non-cumulative as.phvid function
+# Final non-cumulative as.phvid function quarterly
 as.PhVid_SHe <- function(data, MARGIN.THRES=1){
   RES2 <- vector(mode = "list")
   
@@ -524,6 +720,28 @@ as.PhVid_SHe <- function(data, MARGIN.THRES=1){
   
   
   df <- data %>% dplyr::rename(n11 = count) %>% dplyr::select(-quarter)
+  output <- df %>% dplyr::left_join(n1._df) %>% filter(is.na(n1.) == FALSE)
+  output1 <- df %>% left_join(n.1_df)%>% filter(is.na(n.1) == FALSE)
+  
+  test <- output %>% left_join(output1)  
+  RES2$data  <- test %>% dplyr::filter(is.na(test$n.1)== FALSE & test$n1.>= MARGIN.THRES & test$n.1>= MARGIN.THRES) %>% dplyr::select(n11, n1., n.1)
+  
+  
+  RES2$N <- sum(as.data.frame(RES2$data)$n11) 
+  
+  RES2$L <- test %>% dplyr::filter(is.na(test$n.1)== FALSE & test$n1.>= MARGIN.THRES & test$n.1>= MARGIN.THRES) %>% dplyr::select(ing,PT_NAME_ENG) %>% as.data.frame(n=-1)
+  return(RES2)
+}
+
+# Final non-cumulative as.phvid function non-quarterly
+as.PhVid_SHe1 <- function(data, MARGIN.THRES=1){
+  RES2 <- vector(mode = "list")
+  
+  n1._df <- aggregate(count~ing,data,sum)  %>% dplyr::rename(n1. = count) %>% as.data.table(n=-1)#9223*2
+  n.1_df <- aggregate(count~PT_NAME_ENG,data,sum)%>% dplyr::rename(n.1 = count)%>% as.data.table(n=-1) # 3170*2
+  
+  
+  df <- data %>% dplyr::rename(n11 = count) 
   output <- df %>% dplyr::left_join(n1._df) %>% filter(is.na(n1.) == FALSE)
   output1 <- df %>% left_join(n.1_df)%>% filter(is.na(n.1) == FALSE)
   
